@@ -1,0 +1,34 @@
+{
+  "agent_name": "Interview Scheduler Agent",
+  "agent_id": "69a1469030b61d72bfe62b52",
+  "description": "Handles recruiter reply threads -- negotiates interview times, confirms slots, and creates Google Calendar events. Fetches email threads to maintain context.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "interview_scheduled": "boolean",
+    "company": "string",
+    "role": "string",
+    "interview_date": "string",
+    "interview_time": "string",
+    "interview_format": "string",
+    "interviewer": "string",
+    "calendar_event_created": "boolean",
+    "reply_sent": "boolean",
+    "notes": "string",
+    "status": "string"
+  },
+  "example_response": {
+    "interview_scheduled": false,
+    "company": "sample string",
+    "role": "sample string",
+    "interview_date": "sample string",
+    "interview_time": "sample string",
+    "interview_format": "sample string",
+    "interviewer": "sample string",
+    "calendar_event_created": false,
+    "reply_sent": false,
+    "notes": "sample string",
+    "status": "sample string"
+  }
+}

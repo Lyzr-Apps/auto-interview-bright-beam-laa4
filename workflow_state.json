@@ -1,0 +1,91 @@
+{
+  "project": "AutoHire - Autonomous Job Hunting System",
+  "created_at": "2026-02-27",
+  "agents": {
+    "cv_strategist": {
+      "agent_id": "69a1465196a057bf406904c2",
+      "name": "CV Strategist Agent",
+      "type": "independent_with_kb",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "has_knowledge_base": true,
+      "rag_id": "69a1461e00c2d274880effbc",
+      "rag_name": "usercvknowledgebase7lt8"
+    },
+    "job_scout": {
+      "agent_id": "69a1465282720469d8e74b37",
+      "name": "Job Scout Agent",
+      "type": "sub_agent",
+      "provider": "Perplexity",
+      "model": "sonar-pro",
+      "parent": "job_hunt_coordinator"
+    },
+    "application_crafter": {
+      "agent_id": "69a146522ffb8028d20a2151",
+      "name": "Application Crafter Agent",
+      "type": "sub_agent",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "parent": "job_hunt_coordinator"
+    },
+    "outreach_agent": {
+      "agent_id": "69a14664d863768503c9bb56",
+      "name": "Outreach Agent",
+      "type": "sub_agent",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "parent": "job_hunt_coordinator",
+      "tools": ["GMAIL_SEND_EMAIL", "GMAIL_FETCH_EMAILS", "GMAIL_REPLY_TO_THREAD", "GMAIL_LIST_THREADS"]
+    },
+    "job_hunt_coordinator": {
+      "agent_id": "69a1469082720469d8e74b3c",
+      "name": "Job Hunt Coordinator",
+      "type": "manager",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "managed_agents": [
+        {"agent_id": "69a1465282720469d8e74b37", "name": "Job Scout Agent"},
+        {"agent_id": "69a146522ffb8028d20a2151", "name": "Application Crafter Agent"},
+        {"agent_id": "69a14664d863768503c9bb56", "name": "Outreach Agent"}
+      ]
+    },
+    "interview_scheduler": {
+      "agent_id": "69a1469030b61d72bfe62b52",
+      "name": "Interview Scheduler Agent",
+      "type": "independent",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "tools": ["GMAIL_SEND_EMAIL", "GMAIL_FETCH_EMAILS", "GMAIL_REPLY_TO_THREAD", "GMAIL_LIST_THREADS", "GOOGLECALENDAR_CREATE_EVENT", "GOOGLECALENDAR_FIND_FREE_SLOTS", "GOOGLECALENDAR_FIND_EVENT"]
+    },
+    "telegram_notifier": {
+      "agent_id": "69a146913fa1c5bfc0e93e4a",
+      "name": "Telegram Notifier Agent",
+      "type": "independent",
+      "provider": "OpenAI",
+      "model": "gpt-4.1"
+    }
+  },
+  "knowledge_bases": {
+    "user_cv_knowledge_base": {
+      "rag_id": "69a1461e00c2d274880effbc",
+      "rag_name": "usercvknowledgebase7lt8",
+      "description": "Knowledge base for storing and analyzing user's CV/resume content",
+      "linked_agent": "cv_strategist"
+    }
+  },
+  "schedules": {
+    "daily_job_hunt": {
+      "schedule_id": "69a1469825d4d77f732eaeef",
+      "agent_id": "69a1469082720469d8e74b3c",
+      "agent_name": "Job Hunt Coordinator",
+      "cron_expression": "0 8 * * *",
+      "timezone": "America/New_York",
+      "description": "Daily job hunting cycle at 8:00 AM ET",
+      "is_active": false
+    }
+  },
+  "workflow": {
+    "pattern": "manager_subagent_with_independents",
+    "flow": "Input -> CV Strategist -> Job Hunt Coordinator -> [Job Scout, Application Crafter, Outreach Agent] -> Interview Scheduler -> Output; Telegram Notifier -> Output"
+  }
+}

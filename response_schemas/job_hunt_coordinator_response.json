@@ -1,0 +1,50 @@
+{
+  "agent_name": "Job Hunt Coordinator",
+  "agent_id": "69a1469082720469d8e74b3c",
+  "description": "Orchestrates the daily job hunting cycle -- coordinates job discovery, application crafting, and recruiter outreach. Aggregates results and routes only critical decisions to user via Telegram.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "cycle_date": "string",
+    "jobs_found": "number",
+    "applications_sent": "number",
+    "emails_sent": "number",
+    "pending_approvals": "number",
+    "high_priority_jobs": [
+      {
+        "title": "string",
+        "company": "string",
+        "match_score": "number",
+        "status": "string",
+        "action_taken": "string"
+      }
+    ],
+    "outreach_summary": "string",
+    "daily_summary": "string",
+    "next_actions": [
+      "string"
+    ]
+  },
+  "example_response": {
+    "cycle_date": "sample string",
+    "jobs_found": 0,
+    "applications_sent": 0,
+    "emails_sent": 0,
+    "pending_approvals": 0,
+    "high_priority_jobs": [
+      {
+        "title": "sample string",
+        "company": "sample string",
+        "match_score": 0,
+        "status": "sample string",
+        "action_taken": "sample string"
+      }
+    ],
+    "outreach_summary": "sample string",
+    "daily_summary": "sample string",
+    "next_actions": [
+      "sample string"
+    ]
+  }
+}

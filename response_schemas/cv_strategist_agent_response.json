@@ -1,0 +1,34 @@
+{
+  "agent_name": "CV Strategist Agent",
+  "agent_id": "69a1465196a057bf406904c2",
+  "description": "Analyzes uploaded CV to extract skills, experience, strengths, target roles, competitive differentiators, and fastest-path-to-interview strategy. Produces a reusable strategy profile.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "has_knowledge_base": true,
+  "rag_id": "69a1461e00c2d274880effbc",
+  "response_schema": {
+    "target_roles": ["string"],
+    "key_strengths": ["string"],
+    "differentiators": ["string"],
+    "experience_years": "string",
+    "top_skills": ["string"],
+    "strategy_summary": "string",
+    "recommended_channels": ["string"],
+    "salary_positioning": "string",
+    "cv_gaps": ["string"],
+    "quick_fixes": ["string"]
+  },
+  "example_response": {
+    "target_roles": ["Senior Software Engineer", "Staff Engineer", "Engineering Manager"],
+    "key_strengths": ["10 years distributed systems", "Led team of 15", "Open source contributor"],
+    "differentiators": ["Published research on ML infrastructure", "Built systems serving 100M users"],
+    "experience_years": "10",
+    "top_skills": ["Python", "Go", "Kubernetes", "System Design", "Team Leadership"],
+    "strategy_summary": "Target senior IC and EM roles at Series B+ startups and FAANG. Lead with distributed systems expertise and team leadership experience.",
+    "recommended_channels": ["LinkedIn Direct Apply", "Recruiter Outreach", "AngelList", "Company Career Pages"],
+    "salary_positioning": "$180K-$250K base for IC, $200K-$280K for EM roles",
+    "cv_gaps": ["No formal ML certification despite ML experience", "Career gap in 2022"],
+    "quick_fixes": ["Add ML certification from Coursera", "Frame 2022 gap as sabbatical/consulting"]
+  }
+}

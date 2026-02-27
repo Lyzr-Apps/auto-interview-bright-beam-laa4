@@ -1,0 +1,44 @@
+{
+  "agent_name": "Job Scout Agent",
+  "agent_id": "69a1465282720469d8e74b37",
+  "description": "Searches job boards, company career pages, recruiter networks, and hidden job market for roles matching the user's strategy profile. Returns ranked job list with application channels.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "jobs_found": "number",
+    "high_priority_count": "number",
+    "jobs": [
+      {
+        "title": "string",
+        "company": "string",
+        "location": "string",
+        "match_score": "number",
+        "channel": "string",
+        "urgency": "string",
+        "url": "string",
+        "salary_range": "string",
+        "posted_date": "string"
+      }
+    ],
+    "search_summary": "string"
+  },
+  "example_response": {
+    "jobs_found": 12,
+    "high_priority_count": 5,
+    "jobs": [
+      {
+        "title": "Senior Software Engineer",
+        "company": "Stripe",
+        "location": "Remote",
+        "match_score": 95,
+        "channel": "Direct Apply",
+        "urgency": "High - Posted 2 days ago",
+        "url": "https://stripe.com/careers/123",
+        "salary_range": "$180K-$250K",
+        "posted_date": "2026-02-25"
+      }
+    ],
+    "search_summary": "Found 12 matching jobs across 8 companies. 5 high-priority matches."
+  }
+}

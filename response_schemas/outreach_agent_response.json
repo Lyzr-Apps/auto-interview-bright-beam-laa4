@@ -1,0 +1,38 @@
+{
+  "agent_name": "Outreach Agent",
+  "agent_id": "69a14664d863768503c9bb56",
+  "description": "Sends personalized cold outreach emails to recruiters and hiring managers via Gmail. Creates multi-touch sequences.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "emails_sent": "number",
+    "outreach_targets": [
+      {
+        "name": "string",
+        "company": "string",
+        "role": "string",
+        "email_subject": "string",
+        "email_status": "string",
+        "sequence_stage": "string"
+      }
+    ],
+    "follow_ups_scheduled": "number",
+    "summary": "string"
+  },
+  "example_response": {
+    "emails_sent": 3,
+    "outreach_targets": [
+      {
+        "name": "Jane Smith",
+        "company": "Stripe",
+        "role": "Engineering Recruiter",
+        "email_subject": "Re: Senior Engineer Role - Distributed Systems Background",
+        "email_status": "Sent",
+        "sequence_stage": "Intro"
+      }
+    ],
+    "follow_ups_scheduled": 3,
+    "summary": "Sent 3 personalized outreach emails to recruiters at target companies."
+  }
+}

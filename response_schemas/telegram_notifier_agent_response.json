@@ -1,0 +1,40 @@
+{
+  "agent_name": "Telegram Notifier Agent",
+  "agent_id": "69a146913fa1c5bfc0e93e4a",
+  "description": "Sends critical notifications, approval requests, and status summaries to user on Telegram. Receives user decisions and routes them back to relevant agents.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "notification_type": "string",
+    "priority": "string",
+    "message_title": "string",
+    "message_body": "string",
+    "action_required": "boolean",
+    "action_options": [
+      "string"
+    ],
+    "metrics": {
+      "jobs_found": "number",
+      "applications_sent": "number",
+      "responses_received": "number",
+      "interviews_scheduled": "number"
+    }
+  },
+  "example_response": {
+    "notification_type": "sample string",
+    "priority": "sample string",
+    "message_title": "sample string",
+    "message_body": "sample string",
+    "action_required": false,
+    "action_options": [
+      "sample string"
+    ],
+    "metrics": {
+      "jobs_found": 0,
+      "applications_sent": 0,
+      "responses_received": 0,
+      "interviews_scheduled": 0
+    }
+  }
+}

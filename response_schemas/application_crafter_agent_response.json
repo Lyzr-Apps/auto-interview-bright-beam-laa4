@@ -1,0 +1,36 @@
+{
+  "agent_name": "Application Crafter Agent",
+  "agent_id": "69a146522ffb8028d20a2151",
+  "description": "Generates personalized cover letters, tailored application messages, portfolio/project highlights, and skills showcases for each target job.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "applications": [
+      {
+        "job_title": "string",
+        "company": "string",
+        "cover_letter": "string",
+        "application_message": "string",
+        "highlighted_projects": ["string"],
+        "key_alignment_points": ["string"]
+      }
+    ],
+    "total_crafted": "number",
+    "summary": "string"
+  },
+  "example_response": {
+    "applications": [
+      {
+        "job_title": "Senior Software Engineer",
+        "company": "Stripe",
+        "cover_letter": "Dear Hiring Team...",
+        "application_message": "Experienced distributed systems engineer...",
+        "highlighted_projects": ["Built real-time payment processing system", "Open source Kubernetes operator"],
+        "key_alignment_points": ["Payment infrastructure experience", "Scale expertise matching Stripe's needs"]
+      }
+    ],
+    "total_crafted": 5,
+    "summary": "Crafted 5 personalized applications with unique positioning for each company."
+  }
+}
