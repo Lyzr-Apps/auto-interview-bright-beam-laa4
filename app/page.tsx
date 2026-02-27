@@ -15,9 +15,8 @@ import {
 } from '@/lib/scheduler'
 import type { Schedule, ExecutionLog } from '@/lib/scheduler'
 import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -26,9 +25,10 @@ import { Switch } from '@/components/ui/switch'
 import {
   Loader2, Search, Send, Upload, FileText, Trash2, Play, Pause,
   RefreshCw, Clock, Calendar, Mail, Zap, Eye, Check,
-  X, ChevronRight, ChevronDown, AlertTriangle,
-  Sparkles, Shield, Globe, Target, Star, BarChart3,
-  ArrowRight, Terminal, MonitorDot, Archive, Briefcase
+  X, ChevronRight, AlertTriangle,
+  Target, Star, BarChart3,
+  Terminal, Briefcase, Bot,
+  ArrowUp, ArrowDown, Hash, Bell, Menu, PanelLeftClose,
 } from 'lucide-react'
 
 // ============================================================================
@@ -83,188 +83,60 @@ const THEME_VARS = {
 // TYPES
 // ============================================================================
 
-interface ActivityEntry {
+interface ChatMessage {
   id: string
+  type: 'system' | 'user' | 'agent' | 'error' | 'file'
+  agentId?: string
+  agentName?: string
+  content: string
+  data?: any
   timestamp: string
-  agentId: string
-  agentName: string
-  action: string
-  status: 'success' | 'error' | 'pending'
+  formType?: 'outreach' | 'schedule' | 'craft'
 }
 
-interface KanbanJob {
-  id: string
-  company: string
-  role: string
-  status: 'DISCOVERED' | 'APPLIED' | 'CONTACTED' | 'REPLIED' | 'INTERVIEW' | 'DONE'
-  matchScore?: number
-  channel?: string
-}
-
-interface CVProfile {
-  target_roles?: string[]
-  key_strengths?: string[]
-  differentiators?: string[]
-  experience_years?: string
-  top_skills?: string[]
-  strategy_summary?: string
-  recommended_channels?: string[]
-  salary_positioning?: string
-  cv_gaps?: string[]
-  quick_fixes?: string[]
-}
-
-interface CoordinatorResult {
-  cycle_date?: string
-  jobs_found?: number
-  applications_sent?: number
-  emails_sent?: number
-  pending_approvals?: number
-  high_priority_jobs?: Array<{
-    title?: string
-    company?: string
-    match_score?: number
-    status?: string
-    action_taken?: string
-  }>
-  outreach_summary?: string
-  daily_summary?: string
-  next_actions?: string[]
-}
-
-interface OutreachTarget {
-  name?: string
-  company?: string
-  role?: string
-  email_subject?: string
-  email_status?: string
-  sequence_stage?: string
-}
-
-interface ApplicationEntry {
-  job_title?: string
-  company?: string
-  cover_letter?: string
-  application_message?: string
-  highlighted_projects?: string[]
-  key_alignment_points?: string[]
-}
-
-interface InterviewResult {
-  interview_scheduled?: boolean
-  company?: string
-  role?: string
-  interview_date?: string
-  interview_time?: string
-  interview_format?: string
-  interviewer?: string
-  calendar_event_created?: boolean
-  reply_sent?: boolean
-  notes?: string
-  status?: string
+interface PipelineMetrics {
+  jobsFound: number
+  applied: number
+  emailsSent: number
+  interviews: number
+  pending: number
 }
 
 // ============================================================================
-// SAMPLE DATA
+// HELPERS
 // ============================================================================
 
-const SAMPLE_ACTIVITY: ActivityEntry[] = [
-  { id: '1', timestamp: '08:01', agentId: AGENT_IDS.jobScout, agentName: 'Job Scout', action: 'Found 12 new matching roles across 8 companies', status: 'success' },
-  { id: '2', timestamp: '08:03', agentId: AGENT_IDS.applicationCrafter, agentName: 'App Crafter', action: 'Crafted 5 personalized applications for high-priority matches', status: 'success' },
-  { id: '3', timestamp: '08:05', agentId: AGENT_IDS.outreachAgent, agentName: 'Outreach', action: 'Sent 3 cold outreach emails to recruiters at Stripe, Vercel, Linear', status: 'success' },
-  { id: '4', timestamp: '08:06', agentId: AGENT_IDS.telegramNotifier, agentName: 'Telegram', action: 'Notified user: 2 jobs require approval before applying', status: 'pending' },
-  { id: '5', timestamp: '07:45', agentId: AGENT_IDS.cvStrategist, agentName: 'CV Strategist', action: 'Updated strategy profile with new ML certification', status: 'success' },
-]
-
-const SAMPLE_KANBAN: KanbanJob[] = [
-  { id: 'j1', company: 'Stripe', role: 'Senior SWE', status: 'DISCOVERED', matchScore: 95, channel: 'Direct Apply' },
-  { id: 'j2', company: 'Vercel', role: 'Staff Engineer', status: 'APPLIED', matchScore: 92, channel: 'LinkedIn' },
-  { id: 'j3', company: 'Linear', role: 'Backend Lead', status: 'CONTACTED', matchScore: 88, channel: 'Recruiter' },
-  { id: 'j4', company: 'Notion', role: 'Platform Eng', status: 'REPLIED', matchScore: 85 },
-  { id: 'j5', company: 'Figma', role: 'Infra Engineer', status: 'INTERVIEW', matchScore: 90 },
-  { id: 'j6', company: 'Datadog', role: 'SRE Lead', status: 'DISCOVERED', matchScore: 87 },
-  { id: 'j7', company: 'Cloudflare', role: 'Systems Eng', status: 'APPLIED', matchScore: 84 },
-  { id: 'j8', company: 'Supabase', role: 'Eng Manager', status: 'DONE', matchScore: 91 },
-]
-
-const SAMPLE_CV: CVProfile = {
-  target_roles: ['Senior Software Engineer', 'Staff Engineer', 'Engineering Manager'],
-  key_strengths: ['10 years distributed systems', 'Led team of 15', 'Open source contributor'],
-  differentiators: ['Published research on ML infrastructure', 'Built systems serving 100M users'],
-  experience_years: '10',
-  top_skills: ['Python', 'Go', 'Kubernetes', 'System Design', 'Team Leadership'],
-  strategy_summary: 'Target senior IC and EM roles at Series B+ startups and FAANG. Lead with distributed systems expertise and team leadership experience.',
-  recommended_channels: ['LinkedIn Direct Apply', 'Recruiter Outreach', 'AngelList', 'Company Career Pages'],
-  salary_positioning: '$180K-$250K base for IC, $200K-$280K for EM roles',
-  cv_gaps: ['No formal ML certification despite ML experience', 'Career gap in 2022'],
-  quick_fixes: ['Add ML certification from Coursera', 'Frame 2022 gap as sabbatical/consulting'],
+function getTimeStr(): string {
+  const now = new Date()
+  return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 }
 
-const SAMPLE_COORDINATOR: CoordinatorResult = {
-  cycle_date: '2026-02-27',
-  jobs_found: 12,
-  applications_sent: 5,
-  emails_sent: 3,
-  pending_approvals: 2,
-  high_priority_jobs: [
-    { title: 'Senior Software Engineer', company: 'Stripe', match_score: 95, status: 'Applied', action_taken: 'Submitted personalized application' },
-    { title: 'Staff Engineer', company: 'Vercel', match_score: 92, status: 'Outreach Sent', action_taken: 'Cold email to hiring manager' },
-  ],
-  outreach_summary: 'Sent 3 personalized outreach emails to recruiters at target companies.',
-  daily_summary: 'Productive day: 12 jobs found, 5 applications sent, 3 outreach emails dispatched. 2 items pending your approval.',
-  next_actions: ['Follow up with Stripe recruiter', 'Prepare for Figma interview', 'Review Notion response'],
+function getDateStr(): string {
+  const now = new Date()
+  return now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })
 }
 
-const SAMPLE_APPLICATIONS: ApplicationEntry[] = [
-  {
-    job_title: 'Senior Software Engineer',
-    company: 'Stripe',
-    cover_letter: 'Dear Hiring Team, I am excited to apply for the Senior Software Engineer role at Stripe...',
-    application_message: 'Experienced distributed systems engineer with 10 years building payment infrastructure...',
-    highlighted_projects: ['Built real-time payment processing system', 'Open source Kubernetes operator'],
-    key_alignment_points: ['Payment infrastructure experience', 'Scale expertise matching Stripe needs'],
-  },
-  {
-    job_title: 'Staff Engineer',
-    company: 'Vercel',
-    cover_letter: 'Dear Vercel Engineering Team, As a passionate advocate for developer experience...',
-    application_message: 'Full-stack platform engineer specializing in build systems and edge computing...',
-    highlighted_projects: ['Edge runtime optimization framework', 'CI/CD pipeline serving 50K deploys/day'],
-    key_alignment_points: ['Edge computing expertise', 'Developer tooling background'],
-  },
-]
-
-const SAMPLE_OUTREACH: OutreachTarget[] = [
-  { name: 'Jane Smith', company: 'Stripe', role: 'Engineering Recruiter', email_subject: 'Re: Senior Engineer Role', email_status: 'Sent', sequence_stage: 'Intro' },
-  { name: 'Mike Chen', company: 'Vercel', role: 'Hiring Manager', email_subject: 'Staff Engineer - Systems Background', email_status: 'Sent', sequence_stage: 'Intro' },
-  { name: 'Sarah Lee', company: 'Linear', role: 'VP Engineering', email_subject: 'Backend Lead - Distributed Systems', email_status: 'Sent', sequence_stage: 'Intro' },
-]
-
-const SAMPLE_INTERVIEWS: InterviewResult[] = [
-  { interview_scheduled: true, company: 'Figma', role: 'Infra Engineer', interview_date: '2026-03-05', interview_time: '10:00 AM PT', interview_format: 'Video - System Design', interviewer: 'Alex Johnson', calendar_event_created: true, reply_sent: true, notes: 'Prepare system design for real-time collaboration', status: 'Confirmed' },
-]
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
+function genId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+}
 
 function renderMarkdown(text: string) {
   if (!text) return null
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {text.split('\n').map((line, i) => {
         if (line.startsWith('### '))
-          return <h4 key={i} className="font-semibold text-sm mt-3 mb-1 phosphor-glow">{line.slice(4)}</h4>
+          return <h4 key={i} className="font-semibold text-sm mt-2 mb-1 phosphor-glow">{line.slice(4)}</h4>
         if (line.startsWith('## '))
-          return <h3 key={i} className="font-semibold text-base mt-3 mb-1 phosphor-glow">{line.slice(3)}</h3>
+          return <h3 key={i} className="font-semibold text-base mt-2 mb-1 phosphor-glow">{line.slice(3)}</h3>
         if (line.startsWith('# '))
-          return <h2 key={i} className="font-bold text-lg mt-4 mb-2 phosphor-glow">{line.slice(2)}</h2>
+          return <h2 key={i} className="font-bold text-lg mt-3 mb-1 phosphor-glow">{line.slice(2)}</h2>
         if (line.startsWith('- ') || line.startsWith('* '))
-          return <li key={i} className="ml-4 list-disc text-sm">{formatInline(line.slice(2))}</li>
+          return <li key={i} className="ml-4 list-disc text-xs">{formatInline(line.slice(2))}</li>
         if (/^\d+\.\s/.test(line))
-          return <li key={i} className="ml-4 list-decimal text-sm">{formatInline(line.replace(/^\d+\.\s/, ''))}</li>
+          return <li key={i} className="ml-4 list-decimal text-xs">{formatInline(line.replace(/^\d+\.\s/, ''))}</li>
         if (!line.trim()) return <div key={i} className="h-1" />
-        return <p key={i} className="text-sm">{formatInline(line)}</p>
+        return <p key={i} className="text-xs">{formatInline(line)}</p>
       })}
     </div>
   )
@@ -278,14 +150,527 @@ function formatInline(text: string) {
   )
 }
 
-function getTimeStr(): string {
-  const now = new Date()
-  return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+// ============================================================================
+// SAMPLE DATA FOR CHAT
+// ============================================================================
+
+function getSampleMessages(): ChatMessage[] {
+  const ts = getTimeStr()
+  return [
+    { id: 's1', type: 'system', content: 'AutoHire Terminal v2.0 initialized. Type /help for available commands.', timestamp: ts },
+    { id: 's2', type: 'user', content: '/upload resume.pdf', timestamp: ts },
+    { id: 's3', type: 'file', content: 'resume.pdf uploaded to knowledge base', timestamp: ts, agentName: 'System' },
+    { id: 's4', type: 'agent', agentId: AGENT_IDS.cvStrategist, agentName: 'CV Strategist', content: 'CV analysis complete', timestamp: ts, data: {
+      type: 'cv',
+      target_roles: ['Senior Software Engineer', 'Staff Engineer', 'Engineering Manager'],
+      key_strengths: ['10 years distributed systems', 'Led team of 15', 'Open source contributor'],
+      differentiators: ['Published research on ML infrastructure', 'Built systems serving 100M users'],
+      experience_years: '10',
+      top_skills: ['Python', 'Go', 'Kubernetes', 'System Design', 'Team Leadership'],
+      strategy_summary: 'Target senior IC and EM roles at Series B+ startups and FAANG. Lead with distributed systems expertise and team leadership experience.',
+      recommended_channels: ['LinkedIn Direct Apply', 'Recruiter Outreach', 'AngelList'],
+      salary_positioning: '$180K-$250K base for IC, $200K-$280K for EM roles',
+      cv_gaps: ['No formal ML certification despite ML experience', 'Career gap in 2022'],
+      quick_fixes: ['Add ML certification from Coursera', 'Frame 2022 gap as sabbatical/consulting'],
+    }},
+    { id: 's5', type: 'user', content: '/hunt', timestamp: ts },
+    { id: 's6', type: 'agent', agentId: AGENT_IDS.jobHuntCoordinator, agentName: 'Coordinator', content: 'Daily hunt cycle complete', timestamp: ts, data: {
+      type: 'coordinator',
+      cycle_date: '2026-02-27',
+      jobs_found: 12,
+      applications_sent: 5,
+      emails_sent: 3,
+      pending_approvals: 2,
+      high_priority_jobs: [
+        { title: 'Senior Software Engineer', company: 'Stripe', match_score: 95, status: 'Applied', action_taken: 'Submitted personalized application' },
+        { title: 'Staff Engineer', company: 'Vercel', match_score: 92, status: 'Outreach Sent', action_taken: 'Cold email to hiring manager' },
+        { title: 'Backend Lead', company: 'Linear', match_score: 88, status: 'Discovered', action_taken: 'Pending approval' },
+      ],
+      outreach_summary: 'Sent 3 personalized outreach emails to recruiters at Stripe, Vercel, Linear.',
+      daily_summary: 'Productive day: 12 jobs found, 5 applications sent, 3 outreach emails dispatched. 2 items pending your approval.',
+      next_actions: ['Follow up with Stripe recruiter', 'Prepare for Figma interview', 'Review Notion response'],
+    }},
+    { id: 's7', type: 'user', content: '/outreach Jane Smith jane@stripe.com Stripe', timestamp: ts },
+    { id: 's8', type: 'agent', agentId: AGENT_IDS.outreachAgent, agentName: 'Outreach', content: 'Email sent successfully', timestamp: ts, data: {
+      type: 'outreach',
+      emails_sent: 1,
+      outreach_targets: [{ name: 'Jane Smith', company: 'Stripe', role: 'Engineering Recruiter', email_subject: 'Re: Senior Engineer Role - Distributed Systems Background', email_status: 'Sent', sequence_stage: 'Intro' }],
+      follow_ups_scheduled: 1,
+      summary: 'Sent personalized outreach to Jane Smith at Stripe.',
+    }},
+    { id: 's9', type: 'user', content: '/scout', timestamp: ts },
+    { id: 's10', type: 'agent', agentId: AGENT_IDS.jobScout, agentName: 'Job Scout', content: 'Job scan complete', timestamp: ts, data: {
+      type: 'scout',
+      jobs_found: 12,
+      high_priority_count: 5,
+      jobs: [
+        { title: 'Senior Software Engineer', company: 'Stripe', location: 'Remote', match_score: 95, channel: 'Direct Apply', urgency: 'High - Posted 2 days ago', url: 'https://stripe.com/careers/123', salary_range: '$180K-$250K', posted_date: '2026-02-25' },
+        { title: 'Staff Engineer', company: 'Vercel', location: 'SF / Remote', match_score: 92, channel: 'LinkedIn', urgency: 'Medium', url: 'https://vercel.com/careers', salary_range: '$200K-$280K', posted_date: '2026-02-24' },
+        { title: 'Backend Lead', company: 'Linear', location: 'Remote', match_score: 88, channel: 'Recruiter', urgency: 'High - Closing soon', url: 'https://linear.app/jobs', salary_range: '$190K-$260K', posted_date: '2026-02-23' },
+      ],
+      search_summary: 'Found 12 matching jobs across 8 companies. 5 high-priority matches.',
+    }},
+  ]
 }
 
-function getDateStr(): string {
-  const now = new Date()
-  return now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' })
+// ============================================================================
+// STATUS DOT
+// ============================================================================
+
+function StatusDot({ status }: { status: 'success' | 'error' | 'pending' | 'active' | 'idle' }) {
+  const colors: Record<string, string> = {
+    success: 'bg-green-500',
+    error: 'bg-red-500',
+    pending: 'bg-yellow-500',
+    active: 'bg-green-500 animate-pulse',
+    idle: 'bg-muted-foreground',
+  }
+  return <span className={`inline-block w-2 h-2 flex-shrink-0 ${colors[status] ?? 'bg-muted-foreground'}`} />
+}
+
+// ============================================================================
+// CHAT MESSAGE RENDERERS (rich cards for agent responses)
+// ============================================================================
+
+function CVStrategyCard({ data }: { data: any }) {
+  return (
+    <div className="space-y-3 mt-1">
+      {/* Target Roles */}
+      <div>
+        <div className="text-xs text-muted-foreground tracking-wider mb-1">TARGET ROLES</div>
+        <div className="flex flex-wrap gap-1">
+          {Array.isArray(data?.target_roles) && data.target_roles.map((r: string, i: number) => (
+            <Badge key={i} variant="outline" className="font-mono text-xs">{r}</Badge>
+          ))}
+        </div>
+        {data?.experience_years && <div className="text-xs text-muted-foreground mt-1">{data.experience_years} years experience</div>}
+      </div>
+
+      {/* Skills */}
+      {Array.isArray(data?.top_skills) && data.top_skills.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground tracking-wider mb-1">SKILLS</div>
+          <div className="space-y-1">
+            {data.top_skills.map((skill: string, i: number) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className="w-24 truncate">{skill}</span>
+                <div className="flex-1 h-1.5 bg-secondary border border-border">
+                  <div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, 95 - i * 8))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Strengths */}
+      {Array.isArray(data?.key_strengths) && data.key_strengths.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground tracking-wider mb-1">KEY STRENGTHS</div>
+          {data.key_strengths.map((s: string, i: number) => (
+            <div key={i} className="text-xs flex items-start gap-1.5 mb-0.5">
+              <Check className="w-3 h-3 mt-0.5 text-primary flex-shrink-0" />
+              <span>{s}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Differentiators */}
+      {Array.isArray(data?.differentiators) && data.differentiators.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground tracking-wider mb-1">DIFFERENTIATORS</div>
+          {data.differentiators.map((d: string, i: number) => (
+            <div key={i} className="text-xs flex items-start gap-1.5 mb-0.5">
+              <Star className="w-3 h-3 mt-0.5 text-primary flex-shrink-0" />
+              <span>{d}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Strategy Summary */}
+      {data?.strategy_summary && (
+        <div>
+          <div className="text-xs text-muted-foreground tracking-wider mb-1">STRATEGY</div>
+          <div className="text-xs border-l-2 border-primary pl-2">{renderMarkdown(data.strategy_summary)}</div>
+        </div>
+      )}
+
+      {/* Channels */}
+      {Array.isArray(data?.recommended_channels) && data.recommended_channels.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground tracking-wider mb-1">CHANNELS</div>
+          <div className="flex flex-wrap gap-1">
+            {data.recommended_channels.map((ch: string, i: number) => (
+              <Badge key={i} variant="secondary" className="font-mono text-xs">{ch}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Salary */}
+      {data?.salary_positioning && (
+        <div>
+          <div className="text-xs text-muted-foreground tracking-wider mb-1">SALARY POSITIONING</div>
+          <div className="text-sm phosphor-glow font-semibold">{data.salary_positioning}</div>
+        </div>
+      )}
+
+      {/* Gaps + Fixes */}
+      <div className="grid grid-cols-2 gap-2">
+        {Array.isArray(data?.cv_gaps) && data.cv_gaps.length > 0 && (
+          <div className="border border-red-900 p-2">
+            <div className="text-xs text-red-500 tracking-wider mb-1">GAPS</div>
+            {data.cv_gaps.map((g: string, i: number) => (
+              <div key={i} className="text-xs text-red-400 flex items-start gap-1 mb-0.5">
+                <X className="w-3 h-3 mt-0.5 flex-shrink-0" />{g}
+              </div>
+            ))}
+          </div>
+        )}
+        {Array.isArray(data?.quick_fixes) && data.quick_fixes.length > 0 && (
+          <div className="border border-green-900 p-2">
+            <div className="text-xs tracking-wider mb-1">FIXES</div>
+            {data.quick_fixes.map((f: string, i: number) => (
+              <div key={i} className="text-xs flex items-start gap-1 mb-0.5">
+                <Check className="w-3 h-3 mt-0.5 text-primary flex-shrink-0" />{f}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CoordinatorCard({ data }: { data: any }) {
+  return (
+    <div className="space-y-3 mt-1">
+      {/* Metrics bar */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: 'JOBS', value: data?.jobs_found ?? 0 },
+          { label: 'APPS', value: data?.applications_sent ?? 0 },
+          { label: 'EMAILS', value: data?.emails_sent ?? 0 },
+          { label: 'PENDING', value: data?.pending_approvals ?? 0 },
+        ].map((m, i) => (
+          <div key={i} className="border border-border p-1.5 text-center">
+            <div className="text-lg font-bold phosphor-glow">{m.value}</div>
+            <div className="text-xs text-muted-foreground tracking-wider">{m.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* High Priority Jobs */}
+      {Array.isArray(data?.high_priority_jobs) && data.high_priority_jobs.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground tracking-wider mb-1">HIGH PRIORITY JOBS</div>
+          <div className="space-y-1">
+            {data.high_priority_jobs.map((j: any, i: number) => (
+              <div key={i} className="border border-border p-2 flex items-center gap-2 text-xs">
+                <div className="font-semibold">{j?.company ?? '--'}</div>
+                <div className="text-muted-foreground flex-1 truncate">{j?.title ?? '--'}</div>
+                {(j?.match_score ?? 0) > 0 && (
+                  <Badge variant="outline" className="font-mono text-xs">{j.match_score}%</Badge>
+                )}
+                <Badge variant={j?.status?.toLowerCase()?.includes('applied') ? 'default' : 'secondary'} className="font-mono text-xs">{j?.status ?? '--'}</Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Daily Summary */}
+      {data?.daily_summary && (
+        <div>
+          <div className="text-xs text-muted-foreground tracking-wider mb-1">DAILY SUMMARY</div>
+          <div className="text-xs border-l-2 border-primary pl-2">{renderMarkdown(data.daily_summary)}</div>
+        </div>
+      )}
+
+      {/* Outreach Summary */}
+      {data?.outreach_summary && (
+        <div className="text-xs text-muted-foreground">{data.outreach_summary}</div>
+      )}
+
+      {/* Next Actions */}
+      {Array.isArray(data?.next_actions) && data.next_actions.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground tracking-wider mb-1">NEXT ACTIONS</div>
+          {data.next_actions.map((a: string, i: number) => (
+            <div key={i} className="text-xs flex items-center gap-1.5 mb-0.5">
+              <ChevronRight className="w-3 h-3 text-primary flex-shrink-0" />{a}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OutreachCard({ data }: { data: any }) {
+  return (
+    <div className="space-y-2 mt-1">
+      <div className="flex items-center gap-3">
+        <div className="text-xs"><span className="text-muted-foreground">Emails sent:</span> <span className="phosphor-glow font-bold">{data?.emails_sent ?? 0}</span></div>
+        <div className="text-xs"><span className="text-muted-foreground">Follow-ups:</span> <span className="font-bold">{data?.follow_ups_scheduled ?? 0}</span></div>
+      </div>
+      {Array.isArray(data?.outreach_targets) && data.outreach_targets.map((t: any, i: number) => (
+        <div key={i} className="border border-border p-2 text-xs space-y-1">
+          <div className="flex items-center gap-2">
+            <Mail className="w-3 h-3 text-primary flex-shrink-0" />
+            <span className="font-semibold">{t?.name ?? '--'}</span>
+            <span className="text-muted-foreground">{t?.company ?? ''}</span>
+            <span className="text-muted-foreground">{t?.role ?? ''}</span>
+            <span className="flex-1" />
+            <Badge variant="outline" className="font-mono text-xs">{t?.sequence_stage ?? '--'}</Badge>
+            <Badge variant={t?.email_status === 'Sent' ? 'default' : 'secondary'} className="font-mono text-xs">{t?.email_status ?? '--'}</Badge>
+          </div>
+          {t?.email_subject && <div className="text-muted-foreground ml-5">Subject: {t.email_subject}</div>}
+        </div>
+      ))}
+      {data?.summary && <div className="text-xs text-muted-foreground">{data.summary}</div>}
+    </div>
+  )
+}
+
+function JobScoutCard({ data }: { data: any }) {
+  return (
+    <div className="space-y-2 mt-1">
+      <div className="flex items-center gap-3">
+        <div className="text-xs"><span className="text-muted-foreground">Found:</span> <span className="phosphor-glow font-bold">{data?.jobs_found ?? 0}</span></div>
+        <div className="text-xs"><span className="text-muted-foreground">High Priority:</span> <span className="font-bold text-yellow-500">{data?.high_priority_count ?? 0}</span></div>
+      </div>
+      {Array.isArray(data?.jobs) && data.jobs.map((j: any, i: number) => (
+        <div key={i} className="border border-border p-2 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Briefcase className="w-3 h-3 text-primary flex-shrink-0" />
+            <span className="font-semibold">{j?.company ?? '--'}</span>
+            <span className="text-muted-foreground">{j?.title ?? '--'}</span>
+            <span className="flex-1" />
+            {(j?.match_score ?? 0) > 0 && <Badge variant="outline" className="font-mono text-xs">{j.match_score}%</Badge>}
+            {j?.channel && <Badge variant="secondary" className="font-mono text-xs">{j.channel}</Badge>}
+          </div>
+          <div className="flex items-center gap-3 mt-1 text-muted-foreground flex-wrap">
+            {j?.location && <span>{j.location}</span>}
+            {j?.salary_range && <span>{j.salary_range}</span>}
+            {j?.urgency && <span className="text-yellow-500">{j.urgency}</span>}
+          </div>
+          {j?.url && (
+            <a href={j.url} target="_blank" rel="noopener noreferrer" className="text-primary underline mt-0.5 inline-block">Apply Link</a>
+          )}
+        </div>
+      ))}
+      {data?.search_summary && <div className="text-xs text-muted-foreground">{data.search_summary}</div>}
+    </div>
+  )
+}
+
+function InterviewCard({ data }: { data: any }) {
+  return (
+    <div className="space-y-2 mt-1">
+      <div className="border border-border p-2 text-xs space-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Calendar className="w-3 h-3 text-primary flex-shrink-0" />
+          <span className="font-semibold">{data?.company ?? '--'}</span>
+          <span className="text-muted-foreground">{data?.role ?? ''}</span>
+          <span className="flex-1" />
+          <Badge variant={data?.interview_scheduled ? 'default' : 'secondary'} className="font-mono text-xs">{data?.status ?? (data?.interview_scheduled ? 'SCHEDULED' : 'PROCESSING')}</Badge>
+        </div>
+        {(data?.interview_date || data?.interview_time) && (
+          <div className="ml-5 text-muted-foreground">{data?.interview_date ?? ''} {data?.interview_time ?? ''}</div>
+        )}
+        {data?.interview_format && <div className="ml-5"><Badge variant="outline" className="font-mono text-xs">{data.interview_format}</Badge></div>}
+        {data?.interviewer && <div className="ml-5 text-muted-foreground">Interviewer: {data.interviewer}</div>}
+        {data?.calendar_event_created && <div className="ml-5 flex items-center gap-1"><Check className="w-3 h-3 text-primary" /><span>Calendar event created</span></div>}
+        {data?.reply_sent && <div className="ml-5 flex items-center gap-1"><Check className="w-3 h-3 text-primary" /><span>Reply sent</span></div>}
+        {data?.notes && <div className="ml-5 text-muted-foreground mt-1">{data.notes}</div>}
+      </div>
+    </div>
+  )
+}
+
+function ApplicationCrafterCard({ data }: { data: any }) {
+  return (
+    <div className="space-y-2 mt-1">
+      <div className="text-xs"><span className="text-muted-foreground">Total crafted:</span> <span className="phosphor-glow font-bold">{data?.total_crafted ?? 0}</span></div>
+      {Array.isArray(data?.applications) && data.applications.map((app: any, i: number) => (
+        <div key={i} className="border border-border p-2 text-xs space-y-1">
+          <div className="flex items-center gap-2">
+            <FileText className="w-3 h-3 text-primary flex-shrink-0" />
+            <span className="font-semibold">{app?.company ?? '--'}</span>
+            <span className="text-muted-foreground">{app?.job_title ?? '--'}</span>
+          </div>
+          {app?.cover_letter && (
+            <div className="ml-5">
+              <div className="text-muted-foreground tracking-wider mb-0.5">COVER LETTER:</div>
+              <div className="text-xs max-h-20 overflow-y-auto terminal-scroll">{renderMarkdown(app.cover_letter)}</div>
+            </div>
+          )}
+          {app?.application_message && (
+            <div className="ml-5">
+              <div className="text-muted-foreground tracking-wider mb-0.5">APP MESSAGE:</div>
+              <div className="text-xs">{renderMarkdown(app.application_message)}</div>
+            </div>
+          )}
+          {Array.isArray(app?.highlighted_projects) && app.highlighted_projects.length > 0 && (
+            <div className="ml-5 flex flex-wrap gap-1">
+              {app.highlighted_projects.map((p: string, pi: number) => (
+                <Badge key={pi} variant="secondary" className="font-mono text-xs">{p}</Badge>
+              ))}
+            </div>
+          )}
+          {Array.isArray(app?.key_alignment_points) && app.key_alignment_points.length > 0 && (
+            <div className="ml-5 flex flex-wrap gap-1">
+              {app.key_alignment_points.map((k: string, ki: number) => (
+                <Badge key={ki} variant="outline" className="font-mono text-xs">{k}</Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      {data?.summary && <div className="text-xs text-muted-foreground">{data.summary}</div>}
+    </div>
+  )
+}
+
+function TelegramCard({ data }: { data: any }) {
+  return (
+    <div className="space-y-2 mt-1">
+      <div className="border border-border p-2 text-xs space-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Bell className="w-3 h-3 text-primary flex-shrink-0" />
+          <span className="font-semibold">{data?.message_title ?? 'Notification'}</span>
+          {data?.priority && <Badge variant={data.priority === 'high' ? 'destructive' : 'outline'} className="font-mono text-xs">{data.priority}</Badge>}
+          {data?.notification_type && <Badge variant="secondary" className="font-mono text-xs">{data.notification_type}</Badge>}
+        </div>
+        {data?.message_body && <div className="text-xs ml-5">{renderMarkdown(data.message_body)}</div>}
+        {data?.action_required && (
+          <div className="ml-5 text-yellow-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Action Required</div>
+        )}
+        {Array.isArray(data?.action_options) && data.action_options.length > 0 && (
+          <div className="ml-5 flex flex-wrap gap-1">
+            {data.action_options.map((opt: string, i: number) => (
+              <Badge key={i} variant="outline" className="font-mono text-xs">{opt}</Badge>
+            ))}
+          </div>
+        )}
+        {data?.metrics && (
+          <div className="ml-5 flex gap-3 text-muted-foreground mt-1">
+            <span>Jobs: {data.metrics.jobs_found ?? 0}</span>
+            <span>Apps: {data.metrics.applications_sent ?? 0}</span>
+            <span>Responses: {data.metrics.responses_received ?? 0}</span>
+            <span>Interviews: {data.metrics.interviews_scheduled ?? 0}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function renderAgentData(agentId: string | undefined, data: any) {
+  if (!data) return null
+  const cardType = data?.type
+  if (cardType === 'cv' || agentId === AGENT_IDS.cvStrategist) return <CVStrategyCard data={data} />
+  if (cardType === 'coordinator' || agentId === AGENT_IDS.jobHuntCoordinator) return <CoordinatorCard data={data} />
+  if (cardType === 'outreach' || agentId === AGENT_IDS.outreachAgent) return <OutreachCard data={data} />
+  if (cardType === 'scout' || agentId === AGENT_IDS.jobScout) return <JobScoutCard data={data} />
+  if (cardType === 'interview' || agentId === AGENT_IDS.interviewScheduler) return <InterviewCard data={data} />
+  if (cardType === 'application' || agentId === AGENT_IDS.applicationCrafter) return <ApplicationCrafterCard data={data} />
+  if (cardType === 'telegram' || agentId === AGENT_IDS.telegramNotifier) return <TelegramCard data={data} />
+  // Fallback: render as text
+  if (typeof data === 'string') return <div className="text-xs mt-1">{renderMarkdown(data)}</div>
+  return <pre className="text-xs mt-1 max-h-40 overflow-y-auto terminal-scroll whitespace-pre-wrap">{JSON.stringify(data, null, 2)}</pre>
+}
+
+// ============================================================================
+// INLINE FORM CARD (rendered inside chat)
+// ============================================================================
+
+function InlineOutreachForm({ onSubmit, loading }: { onSubmit: (form: { recipientName: string; email: string; company: string; role: string; context: string }) => void; loading: boolean }) {
+  const [form, setForm] = useState({ recipientName: '', email: '', company: '', role: '', context: '' })
+  return (
+    <div className="border border-border bg-secondary p-3 space-y-2 mt-1 text-xs">
+      <div className="text-muted-foreground tracking-wider">OUTREACH DETAILS:</div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-xs font-mono">Recipient *</Label>
+          <Input placeholder="Jane Smith" value={form.recipientName} onChange={(e) => setForm(prev => ({ ...prev, recipientName: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+        </div>
+        <div>
+          <Label className="text-xs font-mono">Email *</Label>
+          <Input type="email" placeholder="jane@company.com" value={form.email} onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+        </div>
+        <div>
+          <Label className="text-xs font-mono">Company</Label>
+          <Input placeholder="Stripe" value={form.company} onChange={(e) => setForm(prev => ({ ...prev, company: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+        </div>
+        <div>
+          <Label className="text-xs font-mono">Role</Label>
+          <Input placeholder="Eng. Recruiter" value={form.role} onChange={(e) => setForm(prev => ({ ...prev, role: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs font-mono">Context</Label>
+        <Input placeholder="Interested in Senior Engineer role..." value={form.context} onChange={(e) => setForm(prev => ({ ...prev, context: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+      </div>
+      <Button size="sm" onClick={() => onSubmit(form)} disabled={loading || !form.recipientName || !form.email} className="font-mono text-xs tracking-wider w-full">
+        {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
+        SEND OUTREACH
+      </Button>
+    </div>
+  )
+}
+
+function InlineScheduleForm({ onSubmit, loading }: { onSubmit: (form: { recruiterEmail: string; threadContext: string; availability: string }) => void; loading: boolean }) {
+  const [form, setForm] = useState({ recruiterEmail: '', threadContext: '', availability: '' })
+  return (
+    <div className="border border-border bg-secondary p-3 space-y-2 mt-1 text-xs">
+      <div className="text-muted-foreground tracking-wider">INTERVIEW SCHEDULING DETAILS:</div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-xs font-mono">Recruiter Email *</Label>
+          <Input type="email" placeholder="recruiter@company.com" value={form.recruiterEmail} onChange={(e) => setForm(prev => ({ ...prev, recruiterEmail: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+        </div>
+        <div>
+          <Label className="text-xs font-mono">Availability</Label>
+          <Input placeholder="Weekdays 9am-5pm PT" value={form.availability} onChange={(e) => setForm(prev => ({ ...prev, availability: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs font-mono">Thread Context *</Label>
+        <Input placeholder="Follow up on Senior Engineer role at Stripe..." value={form.threadContext} onChange={(e) => setForm(prev => ({ ...prev, threadContext: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+      </div>
+      <Button size="sm" onClick={() => onSubmit(form)} disabled={loading || !form.recruiterEmail || !form.threadContext} className="font-mono text-xs tracking-wider w-full">
+        {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Calendar className="w-3 h-3 mr-1" />}
+        SCHEDULE INTERVIEW
+      </Button>
+    </div>
+  )
+}
+
+function InlineCraftForm({ onSubmit, loading }: { onSubmit: (form: { company: string; role: string }) => void; loading: boolean }) {
+  const [form, setForm] = useState({ company: '', role: '' })
+  return (
+    <div className="border border-border bg-secondary p-3 space-y-2 mt-1 text-xs">
+      <div className="text-muted-foreground tracking-wider">APPLICATION CRAFTING DETAILS:</div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-xs font-mono">Company *</Label>
+          <Input placeholder="Stripe" value={form.company} onChange={(e) => setForm(prev => ({ ...prev, company: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+        </div>
+        <div>
+          <Label className="text-xs font-mono">Role *</Label>
+          <Input placeholder="Senior Software Engineer" value={form.role} onChange={(e) => setForm(prev => ({ ...prev, role: e.target.value }))} className="font-mono text-xs bg-input border-border h-7" />
+        </div>
+      </div>
+      <Button size="sm" onClick={() => onSubmit(form)} disabled={loading || !form.company || !form.role} className="font-mono text-xs tracking-wider w-full">
+        {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <FileText className="w-3 h-3 mr-1" />}
+        CRAFT APPLICATION
+      </Button>
+    </div>
+  )
 }
 
 // ============================================================================
@@ -308,12 +693,9 @@ class ErrorBoundary extends React.Component<
       return (
         <div className="min-h-screen flex items-center justify-center bg-background text-foreground font-mono">
           <div className="text-center p-8 max-w-md">
-            <h2 className="text-xl font-semibold mb-2">SYSTEM ERROR</h2>
+            <h2 className="text-xl font-semibold mb-2 phosphor-glow">SYSTEM ERROR</h2>
             <p className="text-muted-foreground mb-4 text-sm">{this.state.error}</p>
-            <button onClick={() => this.setState({ hasError: false, error: '' })}
-              className="px-4 py-2 bg-primary text-primary-foreground text-sm font-mono">
-              RETRY
-            </button>
+            <button onClick={() => this.setState({ hasError: false, error: '' })} className="px-4 py-2 bg-primary text-primary-foreground text-sm font-mono">RETRY</button>
           </div>
         </div>
       )
@@ -323,131 +705,55 @@ class ErrorBoundary extends React.Component<
 }
 
 // ============================================================================
-// INLINE COMPONENTS
-// ============================================================================
-
-function MetricCard({ label, value, icon }: { label: string; value: string | number; icon: React.ReactNode }) {
-  return (
-    <div className="border border-border bg-card p-3 flex flex-col gap-1">
-      <div className="flex items-center gap-2 text-muted-foreground text-xs tracking-wider uppercase">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <div className="text-2xl font-bold phosphor-glow tracking-wider">{value}</div>
-    </div>
-  )
-}
-
-function AgentBadge({ agentId }: { agentId: string }) {
-  const info = AGENT_INFO[agentId]
-  if (!info) return <Badge variant="outline" className="font-mono text-xs">UNKNOWN</Badge>
-  return (
-    <Badge variant="outline" className="font-mono text-xs border-border text-foreground">
-      {info.name}
-    </Badge>
-  )
-}
-
-function StatusDot({ status }: { status: 'success' | 'error' | 'pending' | 'active' | 'idle' }) {
-  const colors: Record<string, string> = {
-    success: 'bg-green-500',
-    error: 'bg-red-500',
-    pending: 'bg-yellow-500',
-    active: 'bg-green-500 animate-pulse',
-    idle: 'bg-muted-foreground',
-  }
-  return <span className={`inline-block w-2 h-2 ${colors[status] ?? 'bg-muted-foreground'}`} />
-}
-
-function KanbanColumn({ title, jobs, count }: { title: string; jobs: KanbanJob[]; count: number }) {
-  return (
-    <div className="flex flex-col gap-2 min-w-0">
-      <div className="text-xs tracking-wider text-muted-foreground flex items-center gap-1">
-        <span>{title}</span>
-        <span className="text-foreground">[{count}]</span>
-      </div>
-      <div className="space-y-1">
-        {jobs.map((job) => (
-          <div key={job.id} className="border border-border bg-secondary p-2 text-xs">
-            <div className="font-semibold truncate">{job.company ?? 'Unknown'}</div>
-            <div className="text-muted-foreground truncate">{job.role ?? 'N/A'}</div>
-            {(job.matchScore ?? 0) > 0 && (
-              <div className="text-xs mt-1">{job.matchScore}% match</div>
-            )}
-          </div>
-        ))}
-        {count === 0 && <div className="text-xs text-muted-foreground border border-dashed border-border p-2 text-center">--</div>}
-      </div>
-    </div>
-  )
-}
-
-function SkillBar({ skill, level }: { skill: string; level: number }) {
-  return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-28 truncate">{skill}</span>
-      <div className="flex-1 h-2 bg-secondary border border-border">
-        <div className="h-full bg-primary" style={{ width: `${Math.min(100, Math.max(0, level))}%` }} />
-      </div>
-      <span className="w-8 text-right text-muted-foreground">{level}%</span>
-    </div>
-  )
-}
-
-// ============================================================================
 // MAIN PAGE
 // ============================================================================
 
 export default function Page() {
-  // ---- State ----
-  const [activeTab, setActiveTab] = useState('mission')
-  const [sampleMode, setSampleMode] = useState(false)
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [inputValue, setInputValue] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
   const [activeAgentId, setActiveAgentId] = useState<string | null>(null)
+  const [sampleMode, setSampleMode] = useState(false)
+
+  // Command history
+  const [commandHistory, setCommandHistory] = useState<string[]>([])
+  const [historyIdx, setHistoryIdx] = useState(-1)
+
+  // Time
   const [currentTime, setCurrentTime] = useState('')
   const [currentDate, setCurrentDate] = useState('')
 
-  // Mission Control state
-  const [commandInput, setCommandInput] = useState('')
-  const [commandResponse, setCommandResponse] = useState('')
-  const [commandLoading, setCommandLoading] = useState(false)
-  const [activityFeed, setActivityFeed] = useState<ActivityEntry[]>([])
-  const [kanbanJobs, setKanbanJobs] = useState<KanbanJob[]>([])
-  const [metrics, setMetrics] = useState({ jobsFound: 0, appsSent: 0, replies: 0, interviews: 0, pending: 0 })
-  const [coordinatorData, setCoordinatorData] = useState<CoordinatorResult | null>(null)
-
-  // Schedule state
+  // Schedule
   const [scheduleId, setScheduleId] = useState(SCHEDULE_ID_INITIAL)
   const [scheduleData, setScheduleData] = useState<Schedule | null>(null)
   const [scheduleLoading, setScheduleLoading] = useState(false)
-  const [scheduleLogs, setScheduleLogs] = useState<ExecutionLog[]>([])
-  const [showLogs, setShowLogs] = useState(false)
-  const [scheduleStatus, setScheduleStatus] = useState('')
 
-  // CV Strategy state
-  const [cvProfile, setCvProfile] = useState<CVProfile | null>(null)
-  const [cvLoading, setCvLoading] = useState(false)
-  const [cvStatus, setCvStatus] = useState('')
+  // Metrics
+  const [pipelineMetrics, setPipelineMetrics] = useState<PipelineMetrics>({ jobsFound: 0, applied: 0, emailsSent: 0, interviews: 0, pending: 0 })
+
+  // KB Docs
   const ragHook = useRAGKnowledgeBase()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Archive state
-  const [applications, setApplications] = useState<ApplicationEntry[]>([])
-  const [outreachTargets, setOutreachTargets] = useState<OutreachTarget[]>([])
-  const [interviews, setInterviews] = useState<InterviewResult[]>([])
-  const [archiveSearch, setArchiveSearch] = useState('')
-  const [expandedApp, setExpandedApp] = useState<number | null>(null)
+  // Inline form states
+  const [showOutreachForm, setShowOutreachForm] = useState(false)
+  const [showScheduleForm, setShowScheduleForm] = useState(false)
+  const [showCraftForm, setShowCraftForm] = useState(false)
 
-  // Outreach form
-  const [outreachForm, setOutreachForm] = useState({ recipientName: '', email: '', company: '', role: '', context: '' })
-  const [outreachLoading, setOutreachLoading] = useState(false)
-  const [outreachStatus, setOutreachStatus] = useState('')
+  // Sidebar state (mobile)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
-  // Interview form
-  const [interviewForm, setInterviewForm] = useState({ recruiterEmail: '', threadContext: '', availability: '' })
-  const [interviewLoading, setInterviewLoading] = useState(false)
-  const [interviewStatus, setInterviewStatus] = useState('')
+  // Refs
+  const chatEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  // ---- Schedule handlers ----
+  // ---- Add message helper ----
+  const addMsg = useCallback((msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+    setMessages(prev => [...prev, { ...msg, id: genId(), timestamp: getTimeStr() }])
+  }, [])
+
+  // ---- Schedule Loader ----
   const loadSchedule = useCallback(async () => {
     setScheduleLoading(true)
     const result = await listSchedules()
@@ -467,7 +773,7 @@ export default function Page() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleId])
 
-  // ---- Effects ----
+  // ---- Init Effects ----
   useEffect(() => {
     setCurrentTime(getTimeStr())
     setCurrentDate(getDateStr())
@@ -482,28 +788,6 @@ export default function Page() {
     loadSchedule()
   }, [loadSchedule])
 
-  useEffect(() => {
-    if (sampleMode) {
-      setActivityFeed(SAMPLE_ACTIVITY)
-      setKanbanJobs(SAMPLE_KANBAN)
-      setMetrics({ jobsFound: 12, appsSent: 5, replies: 2, interviews: 1, pending: 2 })
-      setCoordinatorData(SAMPLE_COORDINATOR)
-      setCvProfile(SAMPLE_CV)
-      setApplications(SAMPLE_APPLICATIONS)
-      setOutreachTargets(SAMPLE_OUTREACH)
-      setInterviews(SAMPLE_INTERVIEWS)
-    } else {
-      setActivityFeed([])
-      setKanbanJobs([])
-      setMetrics({ jobsFound: 0, appsSent: 0, replies: 0, interviews: 0, pending: 0 })
-      setCoordinatorData(null)
-      setCvProfile(null)
-      setApplications([])
-      setOutreachTargets([])
-      setInterviews([])
-    }
-  }, [sampleMode])
-
   const ragFetchRef = useRef(false)
   useEffect(() => {
     if (!ragFetchRef.current) {
@@ -513,235 +797,514 @@ export default function Page() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Welcome message
+  const welcomeRef = useRef(false)
+  useEffect(() => {
+    if (!welcomeRef.current) {
+      welcomeRef.current = true
+      setMessages([{
+        id: genId(),
+        type: 'system',
+        content: 'AutoHire Terminal v2.0 initialized. Type /help for available commands, or use the quick actions in the sidebar.',
+        timestamp: getTimeStr(),
+      }])
+    }
+  }, [])
+
+  // Sample mode toggle
+  useEffect(() => {
+    if (sampleMode) {
+      setMessages(getSampleMessages())
+      setPipelineMetrics({ jobsFound: 12, applied: 5, emailsSent: 3, interviews: 1, pending: 2 })
+    } else {
+      setMessages([{
+        id: genId(),
+        type: 'system',
+        content: 'AutoHire Terminal v2.0 initialized. Type /help for available commands, or use the quick actions in the sidebar.',
+        timestamp: getTimeStr(),
+      }])
+      setPipelineMetrics({ jobsFound: 0, applied: 0, emailsSent: 0, interviews: 0, pending: 0 })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sampleMode])
+
+  // Auto-scroll
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, showOutreachForm, showScheduleForm, showCraftForm])
+
+  // ---- COMMAND PROCESSING ----
+  const processCommand = useCallback(async (raw: string) => {
+    const trimmed = raw.trim()
+    if (!trimmed) return
+
+    // Add user message
+    addMsg({ type: 'user', content: trimmed })
+    setCommandHistory(prev => [...prev, trimmed])
+    setHistoryIdx(-1)
+
+    // Reset inline forms
+    setShowOutreachForm(false)
+    setShowScheduleForm(false)
+    setShowCraftForm(false)
+
+    const lower = trimmed.toLowerCase()
+    const parts = trimmed.split(/\s+/)
+    const cmd = parts[0]?.toLowerCase()
+
+    // ---- /help ----
+    if (cmd === '/help' || cmd === '/start') {
+      addMsg({ type: 'system', content: [
+        'Available Commands:',
+        '',
+        '/upload       - Upload CV (PDF, DOCX, TXT)',
+        '/analyze      - Re-analyze CV in knowledge base',
+        '/hunt         - Run full job hunt cycle (Coordinator)',
+        '/scout        - Find matching jobs (Job Scout)',
+        '/craft        - Craft application for a specific job',
+        '/outreach     - Send recruiter outreach email',
+        '/schedule     - Schedule an interview',
+        '/notify [msg] - Send Telegram notification',
+        '/status       - View schedule & pipeline status',
+        '/pause        - Pause daily schedule',
+        '/activate     - Activate daily schedule',
+        '/run          - Trigger schedule now',
+        '/logs         - View execution logs',
+        '/help         - Show this help',
+        '',
+        'Or type any free-text message to talk to the Coordinator.',
+      ].join('\n') })
+      return
+    }
+
+    // ---- /upload ----
+    if (cmd === '/upload') {
+      fileInputRef.current?.click()
+      return
+    }
+
+    // ---- /analyze ----
+    if (cmd === '/analyze') {
+      setIsProcessing(true)
+      setActiveAgentId(AGENT_IDS.cvStrategist)
+      addMsg({ type: 'system', content: 'Running CV analysis...' })
+      const result = await callAIAgent(
+        'Analyze the uploaded CV and provide a comprehensive strategy profile including target roles, key strengths, differentiators, top skills, strategy summary, recommended channels, salary positioning, CV gaps, and quick fixes.',
+        AGENT_IDS.cvStrategist
+      )
+      setActiveAgentId(null)
+      setIsProcessing(false)
+      if (result.success) {
+        const data = result?.response?.result
+        addMsg({ type: 'agent', agentId: AGENT_IDS.cvStrategist, agentName: 'CV Strategist', content: 'CV analysis complete', data: data ? { ...data, type: 'cv' } : undefined })
+      } else {
+        addMsg({ type: 'error', content: `CV analysis failed: ${result?.error ?? 'Unknown error'}` })
+      }
+      return
+    }
+
+    // ---- /hunt ----
+    if (cmd === '/hunt') {
+      setIsProcessing(true)
+      setActiveAgentId(AGENT_IDS.jobHuntCoordinator)
+      addMsg({ type: 'system', content: 'Launching job hunt cycle... This may take a few minutes.' })
+      const result = await callAIAgent('Execute the daily job hunting cycle. Find matching jobs, craft applications for high-priority matches, send outreach emails to recruiters, and provide a comprehensive summary.', AGENT_IDS.jobHuntCoordinator)
+      setActiveAgentId(null)
+      setIsProcessing(false)
+      if (result.success) {
+        const data = result?.response?.result
+        if (data) {
+          setPipelineMetrics(prev => ({
+            ...prev,
+            jobsFound: data?.jobs_found ?? prev.jobsFound,
+            applied: data?.applications_sent ?? prev.applied,
+            emailsSent: data?.emails_sent ?? prev.emailsSent,
+            pending: data?.pending_approvals ?? prev.pending,
+          }))
+        }
+        addMsg({ type: 'agent', agentId: AGENT_IDS.jobHuntCoordinator, agentName: 'Coordinator', content: 'Hunt cycle complete', data: data ? { ...data, type: 'coordinator' } : undefined })
+      } else {
+        addMsg({ type: 'error', content: `Hunt cycle failed: ${result?.error ?? 'Unknown error'}` })
+      }
+      return
+    }
+
+    // ---- /scout ----
+    if (cmd === '/scout') {
+      setIsProcessing(true)
+      setActiveAgentId(AGENT_IDS.jobScout)
+      addMsg({ type: 'system', content: 'Scanning job boards...' })
+      const result = await callAIAgent('Search all job boards and channels for matching positions based on my strategy profile. Return ranked results with match scores.', AGENT_IDS.jobScout)
+      setActiveAgentId(null)
+      setIsProcessing(false)
+      if (result.success) {
+        const data = result?.response?.result
+        if (data?.jobs_found) {
+          setPipelineMetrics(prev => ({ ...prev, jobsFound: data.jobs_found ?? prev.jobsFound }))
+        }
+        addMsg({ type: 'agent', agentId: AGENT_IDS.jobScout, agentName: 'Job Scout', content: 'Job scan complete', data: data ? { ...data, type: 'scout' } : undefined })
+      } else {
+        addMsg({ type: 'error', content: `Job scout failed: ${result?.error ?? 'Unknown error'}` })
+      }
+      return
+    }
+
+    // ---- /craft ----
+    if (cmd === '/craft') {
+      const company = parts[1]
+      const role = parts.slice(2).join(' ')
+      if (!company || !role) {
+        addMsg({ type: 'system', content: 'Enter application details below:' })
+        setShowCraftForm(true)
+        return
+      }
+      setIsProcessing(true)
+      setActiveAgentId(AGENT_IDS.applicationCrafter)
+      addMsg({ type: 'system', content: `Crafting application for ${role} at ${company}...` })
+      const result = await callAIAgent(`Craft a personalized application for the ${role} position at ${company}. Include cover letter, application message, highlighted projects, and key alignment points.`, AGENT_IDS.applicationCrafter)
+      setActiveAgentId(null)
+      setIsProcessing(false)
+      if (result.success) {
+        const data = result?.response?.result
+        addMsg({ type: 'agent', agentId: AGENT_IDS.applicationCrafter, agentName: 'App Crafter', content: 'Application crafted', data: data ? { ...data, type: 'application' } : undefined })
+      } else {
+        addMsg({ type: 'error', content: `Craft failed: ${result?.error ?? 'Unknown error'}` })
+      }
+      return
+    }
+
+    // ---- /outreach ----
+    if (cmd === '/outreach') {
+      const name = parts[1]
+      const email = parts[2]
+      const company = parts.slice(3).join(' ')
+      if (!name || !email) {
+        addMsg({ type: 'system', content: 'Enter outreach details below:' })
+        setShowOutreachForm(true)
+        return
+      }
+      setIsProcessing(true)
+      setActiveAgentId(AGENT_IDS.outreachAgent)
+      addMsg({ type: 'system', content: `Sending outreach to ${name} (${email})...` })
+      const result = await callAIAgent(`Send a personalized cold outreach email to ${name} at ${email}. They work at ${company || 'unknown company'}. Craft a compelling intro email.`, AGENT_IDS.outreachAgent)
+      setActiveAgentId(null)
+      setIsProcessing(false)
+      if (result.success) {
+        const data = result?.response?.result
+        if (data?.emails_sent) {
+          setPipelineMetrics(prev => ({ ...prev, emailsSent: prev.emailsSent + (data.emails_sent ?? 0) }))
+        }
+        addMsg({ type: 'agent', agentId: AGENT_IDS.outreachAgent, agentName: 'Outreach', content: 'Email sent', data: data ? { ...data, type: 'outreach' } : undefined })
+      } else {
+        addMsg({ type: 'error', content: `Outreach failed: ${result?.error ?? 'Unknown error'}` })
+      }
+      return
+    }
+
+    // ---- /schedule (interview) ----
+    if (cmd === '/schedule') {
+      const recruiterEmail = parts[1]
+      const context = parts.slice(2).join(' ')
+      if (!recruiterEmail || !context) {
+        addMsg({ type: 'system', content: 'Enter interview scheduling details below:' })
+        setShowScheduleForm(true)
+        return
+      }
+      setIsProcessing(true)
+      setActiveAgentId(AGENT_IDS.interviewScheduler)
+      addMsg({ type: 'system', content: `Scheduling interview via ${recruiterEmail}...` })
+      const result = await callAIAgent(`Check email thread with ${recruiterEmail} regarding: ${context}. Negotiate interview time, confirm the slot, and create a Google Calendar event.`, AGENT_IDS.interviewScheduler)
+      setActiveAgentId(null)
+      setIsProcessing(false)
+      if (result.success) {
+        const data = result?.response?.result
+        if (data?.interview_scheduled) {
+          setPipelineMetrics(prev => ({ ...prev, interviews: prev.interviews + 1 }))
+        }
+        addMsg({ type: 'agent', agentId: AGENT_IDS.interviewScheduler, agentName: 'Interview Sched.', content: 'Interview processing complete', data: data ? { ...data, type: 'interview' } : undefined })
+      } else {
+        addMsg({ type: 'error', content: `Interview scheduling failed: ${result?.error ?? 'Unknown error'}` })
+      }
+      return
+    }
+
+    // ---- /notify ----
+    if (cmd === '/notify') {
+      const notifyMsg = parts.slice(1).join(' ') || 'Status check'
+      setIsProcessing(true)
+      setActiveAgentId(AGENT_IDS.telegramNotifier)
+      addMsg({ type: 'system', content: 'Sending Telegram notification...' })
+      const result = await callAIAgent(notifyMsg, AGENT_IDS.telegramNotifier)
+      setActiveAgentId(null)
+      setIsProcessing(false)
+      if (result.success) {
+        const data = result?.response?.result
+        addMsg({ type: 'agent', agentId: AGENT_IDS.telegramNotifier, agentName: 'Telegram', content: 'Notification sent', data: data ? { ...data, type: 'telegram' } : undefined })
+      } else {
+        addMsg({ type: 'error', content: `Notification failed: ${result?.error ?? 'Unknown error'}` })
+      }
+      return
+    }
+
+    // ---- /status ----
+    if (cmd === '/status') {
+      await loadSchedule()
+      addMsg({ type: 'system', content: [
+        'PIPELINE STATUS:',
+        `  Jobs Found:    ${pipelineMetrics.jobsFound}`,
+        `  Applied:       ${pipelineMetrics.applied}`,
+        `  Emails Sent:   ${pipelineMetrics.emailsSent}`,
+        `  Interviews:    ${pipelineMetrics.interviews}`,
+        `  Pending:       ${pipelineMetrics.pending}`,
+        '',
+        'SCHEDULE:',
+        `  Status: ${scheduleData?.is_active ? 'ACTIVE' : 'PAUSED'}`,
+        `  Cron:   ${scheduleData?.cron_expression ? cronToHuman(scheduleData.cron_expression) : 'N/A'}`,
+        `  Next:   ${scheduleData?.next_run_time ? new Date(scheduleData.next_run_time).toLocaleString() : '--'}`,
+        `  Last:   ${scheduleData?.last_run_at ? new Date(scheduleData.last_run_at).toLocaleString() : '--'}`,
+      ].join('\n') })
+      return
+    }
+
+    // ---- /pause ----
+    if (cmd === '/pause') {
+      if (!scheduleId) { addMsg({ type: 'error', content: 'No schedule ID configured' }); return }
+      setScheduleLoading(true)
+      addMsg({ type: 'system', content: 'Pausing schedule...' })
+      const res = await pauseSchedule(scheduleId)
+      await loadSchedule()
+      setScheduleLoading(false)
+      addMsg({ type: 'system', content: res.success ? 'Schedule PAUSED successfully.' : `Failed to pause: ${res.error ?? 'Unknown'}` })
+      return
+    }
+
+    // ---- /activate ----
+    if (cmd === '/activate') {
+      if (!scheduleId) { addMsg({ type: 'error', content: 'No schedule ID configured' }); return }
+      setScheduleLoading(true)
+      addMsg({ type: 'system', content: 'Activating schedule...' })
+      const res = await resumeSchedule(scheduleId)
+      await loadSchedule()
+      setScheduleLoading(false)
+      addMsg({ type: 'system', content: res.success ? 'Schedule ACTIVATED successfully.' : `Failed to activate: ${res.error ?? 'Unknown'}` })
+      return
+    }
+
+    // ---- /run ----
+    if (cmd === '/run') {
+      if (!scheduleId) { addMsg({ type: 'error', content: 'No schedule ID configured' }); return }
+      setScheduleLoading(true)
+      addMsg({ type: 'system', content: 'Triggering immediate run...' })
+      const res = await triggerScheduleNow(scheduleId)
+      setScheduleLoading(false)
+      addMsg({ type: 'system', content: res.success ? 'Schedule triggered. Executing now...' : `Failed to trigger: ${res.error ?? 'Unknown'}` })
+      return
+    }
+
+    // ---- /logs ----
+    if (cmd === '/logs') {
+      if (!scheduleId) { addMsg({ type: 'error', content: 'No schedule ID configured' }); return }
+      setScheduleLoading(true)
+      addMsg({ type: 'system', content: 'Fetching execution logs...' })
+      const res = await getScheduleLogs(scheduleId, { limit: 10 })
+      setScheduleLoading(false)
+      if (res.success && Array.isArray(res.executions) && res.executions.length > 0) {
+        const logLines = res.executions.map((log: ExecutionLog) => {
+          const d = new Date(log.executed_at).toLocaleString()
+          const s = log.success ? '[OK]' : '[FAIL]'
+          const err = log.error_message ? ` - ${log.error_message}` : ''
+          return `  ${s} ${d} (attempt ${log.attempt}/${log.max_attempts})${err}`
+        })
+        addMsg({ type: 'system', content: `EXECUTION LOGS (${res.total} total):\n${logLines.join('\n')}` })
+      } else {
+        addMsg({ type: 'system', content: 'No execution logs found.' })
+      }
+      return
+    }
+
+    // ---- Free text -> Coordinator ----
+    if (!lower.startsWith('/')) {
+      setIsProcessing(true)
+      setActiveAgentId(AGENT_IDS.jobHuntCoordinator)
+      const result = await callAIAgent(trimmed, AGENT_IDS.jobHuntCoordinator)
+      setActiveAgentId(null)
+      setIsProcessing(false)
+      if (result.success) {
+        const data = result?.response?.result
+        const text = result?.response?.message ?? data?.daily_summary ?? data?.text ?? ''
+        if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+          if (data?.jobs_found !== undefined) {
+            setPipelineMetrics(prev => ({
+              ...prev,
+              jobsFound: data?.jobs_found ?? prev.jobsFound,
+              applied: data?.applications_sent ?? prev.applied,
+              emailsSent: data?.emails_sent ?? prev.emailsSent,
+              pending: data?.pending_approvals ?? prev.pending,
+            }))
+          }
+          addMsg({ type: 'agent', agentId: AGENT_IDS.jobHuntCoordinator, agentName: 'Coordinator', content: text || 'Response received', data: { ...data, type: 'coordinator' } })
+        } else {
+          addMsg({ type: 'agent', agentId: AGENT_IDS.jobHuntCoordinator, agentName: 'Coordinator', content: text || JSON.stringify(data) || 'Command processed' })
+        }
+      } else {
+        addMsg({ type: 'error', content: `Error: ${result?.error ?? 'Unknown error'}` })
+      }
+      return
+    }
+
+    // Unknown command
+    addMsg({ type: 'error', content: `Unknown command: ${cmd}. Type /help for available commands.` })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addMsg, scheduleId, scheduleData, pipelineMetrics, loadSchedule])
+
+  // ---- Input handlers ----
+  const handleSubmit = () => {
+    if (!inputValue.trim() || isProcessing) return
+    const val = inputValue
+    setInputValue('')
+    processCommand(val)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSubmit()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (commandHistory.length > 0) {
+        const newIdx = historyIdx < 0 ? commandHistory.length - 1 : Math.max(0, historyIdx - 1)
+        setHistoryIdx(newIdx)
+        setInputValue(commandHistory[newIdx] ?? '')
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (historyIdx >= 0) {
+        const newIdx = historyIdx + 1
+        if (newIdx >= commandHistory.length) {
+          setHistoryIdx(-1)
+          setInputValue('')
+        } else {
+          setHistoryIdx(newIdx)
+          setInputValue(commandHistory[newIdx] ?? '')
+        }
+      }
+    }
+  }
+
+  // ---- CV Upload ----
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    addMsg({ type: 'system', content: `Uploading ${file.name} to knowledge base...` })
+    setIsProcessing(true)
+    const uploadResult = await ragHook.uploadDocument(RAG_ID, file)
+    if (uploadResult.success) {
+      addMsg({ type: 'file', content: `${file.name} uploaded successfully`, agentName: 'System' })
+      addMsg({ type: 'system', content: 'Running CV analysis...' })
+      setActiveAgentId(AGENT_IDS.cvStrategist)
+      const result = await callAIAgent(
+        'Analyze the uploaded CV and provide a comprehensive strategy profile including target roles, key strengths, differentiators, top skills, strategy summary, recommended channels, salary positioning, CV gaps, and quick fixes.',
+        AGENT_IDS.cvStrategist
+      )
+      setActiveAgentId(null)
+      if (result.success) {
+        const data = result?.response?.result
+        addMsg({ type: 'agent', agentId: AGENT_IDS.cvStrategist, agentName: 'CV Strategist', content: 'CV analysis complete', data: data ? { ...data, type: 'cv' } : undefined })
+      } else {
+        addMsg({ type: 'error', content: `CV analysis failed: ${result?.error ?? 'Unknown error'}` })
+      }
+    } else {
+      addMsg({ type: 'error', content: `Upload failed: ${uploadResult.error ?? 'Unknown error'}` })
+    }
+    setIsProcessing(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // ---- Inline form submissions ----
+  const handleOutreachFormSubmit = async (form: { recipientName: string; email: string; company: string; role: string; context: string }) => {
+    setShowOutreachForm(false)
+    const cmd = `/outreach ${form.recipientName} ${form.email} ${form.company || 'company'}`
+    addMsg({ type: 'user', content: cmd })
+    setIsProcessing(true)
+    setActiveAgentId(AGENT_IDS.outreachAgent)
+    addMsg({ type: 'system', content: `Sending outreach to ${form.recipientName} (${form.email})...` })
+    const msg = `Send a personalized cold outreach email to ${form.recipientName} at ${form.email}. They work at ${form.company} as ${form.role}. Context: ${form.context}`
+    const result = await callAIAgent(msg, AGENT_IDS.outreachAgent)
+    setActiveAgentId(null)
+    setIsProcessing(false)
+    if (result.success) {
+      const data = result?.response?.result
+      if (data?.emails_sent) {
+        setPipelineMetrics(prev => ({ ...prev, emailsSent: prev.emailsSent + (data.emails_sent ?? 0) }))
+      }
+      addMsg({ type: 'agent', agentId: AGENT_IDS.outreachAgent, agentName: 'Outreach', content: 'Email sent', data: data ? { ...data, type: 'outreach' } : undefined })
+    } else {
+      addMsg({ type: 'error', content: `Outreach failed: ${result?.error ?? 'Unknown error'}` })
+    }
+  }
+
+  const handleScheduleFormSubmit = async (form: { recruiterEmail: string; threadContext: string; availability: string }) => {
+    setShowScheduleForm(false)
+    const cmd = `/schedule ${form.recruiterEmail} ${form.threadContext}`
+    addMsg({ type: 'user', content: cmd })
+    setIsProcessing(true)
+    setActiveAgentId(AGENT_IDS.interviewScheduler)
+    addMsg({ type: 'system', content: `Scheduling interview via ${form.recruiterEmail}...` })
+    const msg = `Check email thread with ${form.recruiterEmail} regarding: ${form.threadContext}. My availability: ${form.availability || 'Flexible, any weekday 9am-5pm'}. Negotiate interview time, confirm the slot, and create a Google Calendar event.`
+    const result = await callAIAgent(msg, AGENT_IDS.interviewScheduler)
+    setActiveAgentId(null)
+    setIsProcessing(false)
+    if (result.success) {
+      const data = result?.response?.result
+      if (data?.interview_scheduled) {
+        setPipelineMetrics(prev => ({ ...prev, interviews: prev.interviews + 1 }))
+      }
+      addMsg({ type: 'agent', agentId: AGENT_IDS.interviewScheduler, agentName: 'Interview Sched.', content: 'Interview processing complete', data: data ? { ...data, type: 'interview' } : undefined })
+    } else {
+      addMsg({ type: 'error', content: `Interview scheduling failed: ${result?.error ?? 'Unknown error'}` })
+    }
+  }
+
+  const handleCraftFormSubmit = async (form: { company: string; role: string }) => {
+    setShowCraftForm(false)
+    const cmd = `/craft ${form.company} ${form.role}`
+    addMsg({ type: 'user', content: cmd })
+    setIsProcessing(true)
+    setActiveAgentId(AGENT_IDS.applicationCrafter)
+    addMsg({ type: 'system', content: `Crafting application for ${form.role} at ${form.company}...` })
+    const result = await callAIAgent(`Craft a personalized application for the ${form.role} position at ${form.company}. Include cover letter, application message, highlighted projects, and key alignment points.`, AGENT_IDS.applicationCrafter)
+    setActiveAgentId(null)
+    setIsProcessing(false)
+    if (result.success) {
+      const data = result?.response?.result
+      addMsg({ type: 'agent', agentId: AGENT_IDS.applicationCrafter, agentName: 'App Crafter', content: 'Application crafted', data: data ? { ...data, type: 'application' } : undefined })
+    } else {
+      addMsg({ type: 'error', content: `Craft failed: ${result?.error ?? 'Unknown error'}` })
+    }
+  }
+
+  // ---- Schedule sidebar handlers ----
   const handleToggleSchedule = async () => {
     if (!scheduleId) return
     setScheduleLoading(true)
-    setScheduleStatus('')
     if (scheduleData?.is_active) {
-      const res = await pauseSchedule(scheduleId)
-      setScheduleStatus(res.success ? 'Schedule paused' : `Error: ${res.error ?? 'Failed'}`)
+      await pauseSchedule(scheduleId)
+      addMsg({ type: 'system', content: 'Schedule paused.' })
     } else {
-      const res = await resumeSchedule(scheduleId)
-      setScheduleStatus(res.success ? 'Schedule activated' : `Error: ${res.error ?? 'Failed'}`)
+      await resumeSchedule(scheduleId)
+      addMsg({ type: 'system', content: 'Schedule activated.' })
     }
     await loadSchedule()
     setScheduleLoading(false)
   }
 
-  const handleTriggerNow = async () => {
+  const handleRunNow = async () => {
     if (!scheduleId) return
     setScheduleLoading(true)
     const res = await triggerScheduleNow(scheduleId)
-    setScheduleStatus(res.success ? 'Triggered -- executing now' : `Error: ${res.error ?? 'Failed'}`)
     setScheduleLoading(false)
+    addMsg({ type: 'system', content: res.success ? 'Schedule triggered. Executing now...' : `Trigger failed: ${res.error ?? 'Unknown'}` })
   }
-
-  const handleLoadLogs = async () => {
-    if (!scheduleId) return
-    setScheduleLoading(true)
-    const res = await getScheduleLogs(scheduleId, { limit: 10 })
-    if (res.success) {
-      setScheduleLogs(res.executions)
-    }
-    setShowLogs(true)
-    setScheduleLoading(false)
-  }
-
-  // ---- Agent call helpers ----
-  const addActivity = (agentId: string, action: string, status: 'success' | 'error' | 'pending') => {
-    const info = AGENT_INFO[agentId]
-    setActivityFeed((prev) => [{
-      id: Date.now().toString(),
-      timestamp: getTimeStr(),
-      agentId,
-      agentName: info?.name ?? 'Unknown',
-      action,
-      status,
-    }, ...prev].slice(0, 50))
-  }
-
-  // Command bar handler
-  const handleCommand = async () => {
-    if (!commandInput.trim()) return
-    setCommandLoading(true)
-    setCommandResponse('')
-    setActiveAgentId(AGENT_IDS.jobHuntCoordinator)
-    addActivity(AGENT_IDS.jobHuntCoordinator, `Command: ${commandInput}`, 'pending')
-
-    const result = await callAIAgent(commandInput, AGENT_IDS.jobHuntCoordinator)
-    setActiveAgentId(null)
-
-    if (result.success) {
-      const data = result?.response?.result
-      if (data) {
-        const coord = data as CoordinatorResult
-        setCoordinatorData(coord)
-        setMetrics({
-          jobsFound: coord.jobs_found ?? 0,
-          appsSent: coord.applications_sent ?? 0,
-          replies: coord.emails_sent ?? 0,
-          interviews: 0,
-          pending: coord.pending_approvals ?? 0,
-        })
-
-        const hpJobs = Array.isArray(coord.high_priority_jobs) ? coord.high_priority_jobs : []
-        if (hpJobs.length > 0) {
-          const newKanbanJobs: KanbanJob[] = hpJobs.map((j, idx) => ({
-            id: `cmd-${Date.now()}-${idx}`,
-            company: j.company ?? 'Unknown',
-            role: j.title ?? 'N/A',
-            status: mapStatus(j.status),
-            matchScore: j.match_score,
-          }))
-          setKanbanJobs((prev) => [...newKanbanJobs, ...prev])
-        }
-
-        const summary = coord.daily_summary ?? coord.outreach_summary ?? ''
-        setCommandResponse(summary || JSON.stringify(data, null, 2))
-        addActivity(AGENT_IDS.jobHuntCoordinator, `Cycle complete: ${coord.jobs_found ?? 0} jobs, ${coord.applications_sent ?? 0} apps`, 'success')
-      } else {
-        const msg = result?.response?.message ?? 'Command processed'
-        setCommandResponse(msg)
-        addActivity(AGENT_IDS.jobHuntCoordinator, msg, 'success')
-      }
-    } else {
-      const errMsg = result?.error ?? 'Command failed'
-      setCommandResponse(`ERROR: ${errMsg}`)
-      addActivity(AGENT_IDS.jobHuntCoordinator, errMsg, 'error')
-    }
-
-    setCommandLoading(false)
-    setCommandInput('')
-  }
-
-  function mapStatus(st?: string): KanbanJob['status'] {
-    if (!st) return 'DISCOVERED'
-    const lower = st.toLowerCase()
-    if (lower.includes('applied') || lower.includes('submitted')) return 'APPLIED'
-    if (lower.includes('contact') || lower.includes('outreach')) return 'CONTACTED'
-    if (lower.includes('repl')) return 'REPLIED'
-    if (lower.includes('interview')) return 'INTERVIEW'
-    if (lower.includes('done') || lower.includes('accepted') || lower.includes('offer')) return 'DONE'
-    return 'DISCOVERED'
-  }
-
-  // CV Upload handler
-  const handleCVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setCvLoading(true)
-    setCvStatus('Uploading CV to knowledge base...')
-
-    const uploadResult = await ragHook.uploadDocument(RAG_ID, file)
-    if (uploadResult.success) {
-      setCvStatus('CV uploaded. Analyzing...')
-      await handleAnalyzeCV()
-    } else {
-      setCvStatus(`Upload failed: ${uploadResult.error ?? 'Unknown error'}`)
-      setCvLoading(false)
-    }
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  const handleAnalyzeCV = async () => {
-    setCvLoading(true)
-    setCvStatus('Running CV analysis...')
-    setActiveAgentId(AGENT_IDS.cvStrategist)
-    addActivity(AGENT_IDS.cvStrategist, 'Analyzing uploaded CV', 'pending')
-
-    const result = await callAIAgent(
-      'Analyze the uploaded CV and provide a comprehensive strategy profile including target roles, key strengths, differentiators, top skills, strategy summary, recommended channels, salary positioning, CV gaps, and quick fixes.',
-      AGENT_IDS.cvStrategist
-    )
-    setActiveAgentId(null)
-
-    if (result.success) {
-      const data = result?.response?.result as CVProfile | undefined
-      if (data) {
-        setCvProfile(data)
-        setCvStatus('Analysis complete')
-        addActivity(AGENT_IDS.cvStrategist, 'CV analysis complete', 'success')
-      } else {
-        setCvStatus('Analysis returned empty data')
-        addActivity(AGENT_IDS.cvStrategist, 'Analysis returned empty', 'error')
-      }
-    } else {
-      setCvStatus(`Analysis failed: ${result?.error ?? 'Unknown'}`)
-      addActivity(AGENT_IDS.cvStrategist, 'Analysis failed', 'error')
-    }
-    setCvLoading(false)
-  }
-
-  const handleDeleteDoc = async (fileName: string) => {
-    await ragHook.removeDocuments(RAG_ID, [fileName])
-  }
-
-  // Outreach handler
-  const handleOutreach = async () => {
-    if (!outreachForm.email || !outreachForm.recipientName) return
-    setOutreachLoading(true)
-    setOutreachStatus('')
-    setActiveAgentId(AGENT_IDS.outreachAgent)
-    addActivity(AGENT_IDS.outreachAgent, `Sending outreach to ${outreachForm.recipientName} at ${outreachForm.company}`, 'pending')
-
-    const message = `Send a personalized cold outreach email to ${outreachForm.recipientName} at ${outreachForm.email}. They work at ${outreachForm.company} as ${outreachForm.role}. Context: ${outreachForm.context}`
-    const result = await callAIAgent(message, AGENT_IDS.outreachAgent)
-    setActiveAgentId(null)
-
-    if (result.success) {
-      const data = result?.response?.result
-      const targets = Array.isArray(data?.outreach_targets) ? data.outreach_targets : []
-      if (targets.length > 0) {
-        setOutreachTargets((prev) => [...targets, ...prev])
-      }
-      setOutreachStatus(`Outreach sent: ${data?.emails_sent ?? 1} email(s)`)
-      addActivity(AGENT_IDS.outreachAgent, `Outreach sent to ${outreachForm.recipientName}`, 'success')
-      setOutreachForm({ recipientName: '', email: '', company: '', role: '', context: '' })
-    } else {
-      setOutreachStatus(`Failed: ${result?.error ?? 'Unknown error'}`)
-      addActivity(AGENT_IDS.outreachAgent, 'Outreach failed', 'error')
-    }
-    setOutreachLoading(false)
-  }
-
-  // Interview scheduler handler
-  const handleScheduleInterview = async () => {
-    if (!interviewForm.recruiterEmail || !interviewForm.threadContext) return
-    setInterviewLoading(true)
-    setInterviewStatus('')
-    setActiveAgentId(AGENT_IDS.interviewScheduler)
-    addActivity(AGENT_IDS.interviewScheduler, `Scheduling interview via ${interviewForm.recruiterEmail}`, 'pending')
-
-    const message = `Check email thread with ${interviewForm.recruiterEmail} regarding: ${interviewForm.threadContext}. My availability: ${interviewForm.availability || 'Flexible, any weekday 9am-5pm'}. Negotiate interview time, confirm the slot, and create a Google Calendar event.`
-    const result = await callAIAgent(message, AGENT_IDS.interviewScheduler)
-    setActiveAgentId(null)
-
-    if (result.success) {
-      const data = result?.response?.result as InterviewResult | undefined
-      if (data) {
-        setInterviews((prev) => [data, ...prev])
-        setInterviewStatus(data.interview_scheduled ? `Interview scheduled at ${data.company ?? 'company'}` : `Status: ${data.status ?? 'Processing'}`)
-        addActivity(AGENT_IDS.interviewScheduler, `Interview ${data.interview_scheduled ? 'scheduled' : 'processing'}: ${data.company ?? ''}`, data.interview_scheduled ? 'success' : 'pending')
-      }
-      setInterviewForm({ recruiterEmail: '', threadContext: '', availability: '' })
-    } else {
-      setInterviewStatus(`Failed: ${result?.error ?? 'Unknown'}`)
-      addActivity(AGENT_IDS.interviewScheduler, 'Interview scheduling failed', 'error')
-    }
-    setInterviewLoading(false)
-  }
-
-  // ---- Kanban Helpers ----
-  const kanbanStatuses: KanbanJob['status'][] = ['DISCOVERED', 'APPLIED', 'CONTACTED', 'REPLIED', 'INTERVIEW', 'DONE']
-  const getKanbanJobs = (status: KanbanJob['status']) => kanbanJobs.filter((j) => j.status === status)
-
-  // ---- Filtered applications ----
-  const filteredApplications = applications.filter((app) => {
-    const matchSearch = archiveSearch
-      ? (app.company?.toLowerCase().includes(archiveSearch.toLowerCase()) || app.job_title?.toLowerCase().includes(archiveSearch.toLowerCase()))
-      : true
-    return matchSearch
-  })
 
   // ============================================================================
   // RENDER
@@ -749,876 +1312,308 @@ export default function Page() {
 
   return (
     <ErrorBoundary>
-      <div style={THEME_VARS as React.CSSProperties} className="min-h-screen bg-background text-foreground font-mono crt-scanlines crt-flicker">
-        {/* HEADER */}
-        <div className="border-b border-border bg-card px-4 py-3">
-          <div className="max-w-[1400px] mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Terminal className="w-5 h-5" />
-              <h1 className="text-lg tracking-wider phosphor-glow-strong font-bold">
-                AUTOHIRE <span className="text-muted-foreground">//</span> MISSION CONTROL
-              </h1>
-              <span className="terminal-cursor text-foreground" />
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-xs">
-                <Label htmlFor="sampleToggle" className="text-muted-foreground tracking-wider text-xs font-mono cursor-pointer">SAMPLE DATA</Label>
-                <Switch id="sampleToggle" checked={sampleMode} onCheckedChange={setSampleMode} />
+      <div style={THEME_VARS as React.CSSProperties} className="h-screen bg-background text-foreground font-mono crt-scanlines crt-flicker flex flex-col overflow-hidden">
+        {/* Hidden file input */}
+        <input ref={fileInputRef} type="file" accept=".pdf,.docx,.txt" className="hidden" onChange={handleFileUpload} />
+
+        {/* MAIN LAYOUT */}
+        <div className="flex flex-1 overflow-hidden">
+
+          {/* ============================================================ */}
+          {/* SIDEBAR */}
+          {/* ============================================================ */}
+          <div className={`${sidebarOpen ? 'w-[280px]' : 'w-0'} flex-shrink-0 border-r border-border bg-card flex flex-col overflow-hidden transition-all duration-200`}>
+            <div className="flex flex-col h-full overflow-y-auto terminal-scroll">
+              {/* Logo / Header */}
+              <div className="p-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <Terminal className="w-5 h-5 text-primary" />
+                  <h1 className="text-base tracking-wider phosphor-glow-strong font-bold">AUTOHIRE</h1>
+                  <span className="terminal-cursor text-foreground" />
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 tracking-wider">{currentDate} <span className="phosphor-glow">{currentTime}</span></div>
               </div>
+
+              {/* Schedule Status */}
+              <div className="p-3 border-b border-border">
+                <div className="text-xs text-muted-foreground tracking-wider mb-2">SCHEDULE</div>
+                <div className="flex items-center gap-2 mb-2">
+                  <StatusDot status={scheduleData?.is_active ? 'active' : 'idle'} />
+                  <span className={`text-xs tracking-wider font-semibold ${scheduleData?.is_active ? 'phosphor-glow' : 'text-muted-foreground'}`}>{scheduleData?.is_active ? 'ACTIVE' : 'PAUSED'}</span>
+                </div>
+                <div className="text-xs text-muted-foreground mb-1">{scheduleData?.cron_expression ? cronToHuman(scheduleData.cron_expression) : 'Loading...'}</div>
+                <div className="text-xs text-muted-foreground mb-2">Next: {scheduleData?.next_run_time ? new Date(scheduleData.next_run_time).toLocaleString() : '--'}</div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant={scheduleData?.is_active ? 'destructive' : 'default'} onClick={handleToggleSchedule} disabled={scheduleLoading} className="text-xs font-mono tracking-wider flex-1 h-7">
+                    {scheduleLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : scheduleData?.is_active ? <><Pause className="w-3 h-3 mr-1" />PAUSE</> : <><Play className="w-3 h-3 mr-1" />ACTIVATE</>}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleRunNow} disabled={scheduleLoading} className="text-xs font-mono h-7 px-2">
+                    <Zap className="w-3 h-3" />
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={loadSchedule} disabled={scheduleLoading} className="text-xs font-mono h-7 px-2">
+                    <RefreshCw className={`w-3 h-3 ${scheduleLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="p-3 border-b border-border">
+                <div className="text-xs text-muted-foreground tracking-wider mb-2">QUICK ACTIONS</div>
+                <div className="space-y-1">
+                  {[
+                    { label: 'Upload CV', icon: <Upload className="w-3.5 h-3.5" />, action: () => fileInputRef.current?.click() },
+                    { label: 'Run Hunt Cycle', icon: <Target className="w-3.5 h-3.5" />, action: () => processCommand('/hunt') },
+                    { label: 'Scout Jobs', icon: <Search className="w-3.5 h-3.5" />, action: () => processCommand('/scout') },
+                    { label: 'Craft Application', icon: <FileText className="w-3.5 h-3.5" />, action: () => processCommand('/craft') },
+                    { label: 'Send Outreach', icon: <Mail className="w-3.5 h-3.5" />, action: () => processCommand('/outreach') },
+                    { label: 'Schedule Interview', icon: <Calendar className="w-3.5 h-3.5" />, action: () => processCommand('/schedule') },
+                    { label: 'Check Status', icon: <BarChart3 className="w-3.5 h-3.5" />, action: () => processCommand('/status') },
+                    { label: 'View Logs', icon: <Eye className="w-3.5 h-3.5" />, action: () => processCommand('/logs') },
+                  ].map((btn, i) => (
+                    <Button key={i} variant="outline" size="sm" onClick={btn.action} disabled={isProcessing} className="w-full justify-start text-xs font-mono tracking-wider h-7 px-2">
+                      {btn.icon}
+                      <span className="ml-2">{btn.label}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pipeline Metrics */}
+              <div className="p-3 border-b border-border">
+                <div className="text-xs text-muted-foreground tracking-wider mb-2">PIPELINE</div>
+                <div className="space-y-1.5">
+                  {[
+                    { label: 'Jobs Found', value: pipelineMetrics.jobsFound, icon: <Search className="w-3 h-3" /> },
+                    { label: 'Applied', value: pipelineMetrics.applied, icon: <Send className="w-3 h-3" /> },
+                    { label: 'Emails Sent', value: pipelineMetrics.emailsSent, icon: <Mail className="w-3 h-3" /> },
+                    { label: 'Interviews', value: pipelineMetrics.interviews, icon: <Calendar className="w-3 h-3" /> },
+                    { label: 'Pending', value: pipelineMetrics.pending, icon: <Clock className="w-3 h-3" /> },
+                  ].map((m, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">{m.icon}{m.label}</div>
+                      <span className="font-bold phosphor-glow">{m.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Agent Status */}
+              <div className="p-3 border-b border-border">
+                <div className="text-xs text-muted-foreground tracking-wider mb-2">AGENTS</div>
+                <div className="space-y-1">
+                  {Object.entries(AGENT_INFO).map(([id, info]) => (
+                    <div key={id} className="flex items-center gap-2 text-xs group">
+                      <StatusDot status={activeAgentId === id ? 'active' : 'idle'} />
+                      <span className={`${activeAgentId === id ? 'text-foreground phosphor-glow' : 'text-muted-foreground'} truncate flex-1`}>{info.name}</span>
+                      <span className="text-muted-foreground text-xs opacity-0 group-hover:opacity-100 transition-opacity truncate max-w-[100px]">{info.purpose}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* KB Documents */}
+              <div className="p-3 flex-1">
+                <div className="text-xs text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
+                  <span>DOCUMENTS</span>
+                  <Button size="sm" variant="ghost" onClick={() => ragHook.fetchDocuments(RAG_ID)} className="h-5 w-5 p-0">
+                    <RefreshCw className={`w-3 h-3 ${ragHook.loading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+                {ragHook.loading && <div className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Loading...</div>}
+                {ragHook.error && <div className="text-xs text-red-500">{ragHook.error}</div>}
+                {Array.isArray(ragHook.documents) && ragHook.documents.length === 0 && !ragHook.loading && (
+                  <div className="text-xs text-muted-foreground text-center py-2">No documents</div>
+                )}
+                {Array.isArray(ragHook.documents) && ragHook.documents.map((doc, i) => (
+                  <div key={i} className="flex items-center justify-between py-0.5 text-xs">
+                    <div className="flex items-center gap-1 truncate flex-1">
+                      <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                      <span className="truncate">{doc.fileName}</span>
+                    </div>
+                    <Button size="sm" variant="ghost" className="h-5 w-5 p-0 flex-shrink-0" onClick={() => ragHook.removeDocuments(RAG_ID, [doc.fileName])}>
+                      <Trash2 className="w-3 h-3 text-red-500" />
+                    </Button>
+                  </div>
+                ))}
+                <Button size="sm" variant="outline" className="w-full mt-2 text-xs font-mono tracking-wider h-7" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="w-3 h-3 mr-1" />UPLOAD
+                </Button>
+              </div>
+
+              {/* Sample Data Toggle */}
+              <div className="p-3 border-t border-border">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sampleToggle" className="text-xs text-muted-foreground tracking-wider font-mono cursor-pointer">SAMPLE DATA</Label>
+                  <Switch id="sampleToggle" checked={sampleMode} onCheckedChange={setSampleMode} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ============================================================ */}
+          {/* CHAT TERMINAL */}
+          {/* ============================================================ */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Chat header bar */}
+            <div className="border-b border-border bg-card px-3 py-2 flex items-center gap-2 flex-shrink-0">
+              <Button size="sm" variant="ghost" onClick={() => setSidebarOpen(!sidebarOpen)} className="h-7 w-7 p-0">
+                {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </Button>
               <Separator orientation="vertical" className="h-4" />
-              <div className="text-xs text-muted-foreground tracking-wider">
-                <span>{currentDate}</span> <span className="text-foreground phosphor-glow">{currentTime}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* TAB NAV */}
-        <div className="border-b border-border bg-card px-4">
-          <div className="max-w-[1400px] mx-auto">
-            <div className="flex gap-0">
-              {[
-                { key: 'mission', label: 'MISSION_CTRL', num: '1', icon: <MonitorDot className="w-3.5 h-3.5" /> },
-                { key: 'cv', label: 'CV_STRATEGY', num: '2', icon: <FileText className="w-3.5 h-3.5" /> },
-                { key: 'archive', label: 'ARCHIVE', num: '3', icon: <Archive className="w-3.5 h-3.5" /> },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-2.5 text-xs tracking-wider flex items-center gap-2 border-b-2 transition-colors ${activeTab === tab.key ? 'border-primary bg-primary text-primary-foreground font-bold' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                >
-                  {tab.icon}
-                  <span>[{tab.num}]</span>
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* CONTENT */}
-        <div className="max-w-[1400px] mx-auto p-4">
-          {/* ============================================================ */}
-          {/* TAB 1: MISSION CONTROL */}
-          {/* ============================================================ */}
-          {activeTab === 'mission' && (
-            <div className="space-y-4">
-              {/* Metrics Bar */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                <MetricCard label="Jobs Found" value={metrics.jobsFound} icon={<Search className="w-3.5 h-3.5" />} />
-                <MetricCard label="Apps Sent" value={metrics.appsSent} icon={<Send className="w-3.5 h-3.5" />} />
-                <MetricCard label="Emails Out" value={metrics.replies} icon={<Mail className="w-3.5 h-3.5" />} />
-                <MetricCard label="Interviews" value={metrics.interviews} icon={<Calendar className="w-3.5 h-3.5" />} />
-                <MetricCard label="Pending" value={metrics.pending} icon={<AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />} />
-              </div>
-
-              {/* Quick Command Bar */}
-              <Card className="border-border bg-card">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-foreground text-sm phosphor-glow font-bold">&gt;</span>
-                    <Input
-                      value={commandInput}
-                      onChange={(e) => setCommandInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleCommand()}
-                      placeholder="Enter command... (e.g. 'Execute daily job hunt cycle')"
-                      className="flex-1 bg-transparent border-none text-foreground placeholder:text-muted-foreground focus-visible:ring-0 font-mono text-sm"
-                    />
-                    <Button
-                      onClick={handleCommand}
-                      disabled={commandLoading || !commandInput.trim()}
-                      size="sm"
-                      className="font-mono text-xs tracking-wider"
-                    >
-                      {commandLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                    </Button>
-                  </div>
-                  {commandResponse && (
-                    <div className="mt-2 p-2 border border-border bg-secondary text-xs terminal-scroll max-h-40 overflow-y-auto">
-                      <div className="text-muted-foreground mb-1">[COORDINATOR OUTPUT]</div>
-                      {renderMarkdown(commandResponse)}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Schedule Management + Main Content */}
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                {/* Left: Activity Feed */}
-                <div className="lg:col-span-3 space-y-4">
-                  {/* Schedule Panel */}
-                  <Card className="border-border bg-card">
-                    <CardHeader className="p-3 pb-2">
-                      <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5" />
-                        SCHEDULE MANAGEMENT
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <StatusDot status={scheduleData?.is_active ? 'active' : 'idle'} />
-                          <span className="text-xs tracking-wider">
-                            {scheduleData?.is_active ? 'ACTIVE' : 'PAUSED'}
-                          </span>
-                        </div>
-                        <Separator orientation="vertical" className="h-4" />
-                        <div className="text-xs text-muted-foreground">
-                          {scheduleData?.cron_expression ? cronToHuman(scheduleData.cron_expression) : 'Loading...'}
-                          {scheduleData?.timezone ? ` (${scheduleData.timezone})` : ''}
-                        </div>
-                        <Separator orientation="vertical" className="h-4" />
-                        <div className="text-xs text-muted-foreground">
-                          Next: {scheduleData?.next_run_time ? new Date(scheduleData.next_run_time).toLocaleString() : '--'}
-                        </div>
-                        <div className="flex-1" />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant={scheduleData?.is_active ? 'destructive' : 'default'}
-                            onClick={handleToggleSchedule}
-                            disabled={scheduleLoading}
-                            className="text-xs tracking-wider font-mono"
-                          >
-                            {scheduleLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : scheduleData?.is_active ? <Pause className="w-3 h-3 mr-1" /> : <Play className="w-3 h-3 mr-1" />}
-                            {scheduleData?.is_active ? 'PAUSE' : 'ACTIVATE'}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={handleTriggerNow} disabled={scheduleLoading} className="text-xs tracking-wider font-mono">
-                            <Zap className="w-3 h-3 mr-1" />
-                            RUN NOW
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={handleLoadLogs} disabled={scheduleLoading} className="text-xs tracking-wider font-mono">
-                            <Eye className="w-3 h-3 mr-1" />
-                            LOGS
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={loadSchedule} disabled={scheduleLoading} className="text-xs tracking-wider font-mono">
-                            <RefreshCw className={`w-3 h-3 ${scheduleLoading ? 'animate-spin' : ''}`} />
-                          </Button>
-                        </div>
-                      </div>
-                      {scheduleStatus && (
-                        <div className="mt-2 text-xs text-muted-foreground border border-border p-1.5 bg-secondary">
-                          {scheduleStatus}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Run Logs Dialog */}
-                  {showLogs && (
-                    <Card className="border-border bg-card">
-                      <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between">
-                        <CardTitle className="text-xs tracking-wider">EXECUTION LOGS</CardTitle>
-                        <Button size="sm" variant="ghost" onClick={() => setShowLogs(false)} className="h-6 w-6 p-0">
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </CardHeader>
-                      <CardContent className="p-3 pt-0">
-                        <ScrollArea className="max-h-48 terminal-scroll">
-                          {scheduleLogs.length === 0 && <div className="text-xs text-muted-foreground">No execution logs found</div>}
-                          {scheduleLogs.map((log) => (
-                            <div key={log.id} className="flex items-center gap-2 py-1 border-b border-border text-xs">
-                              <StatusDot status={log.success ? 'success' : 'error'} />
-                              <span className="text-muted-foreground">{new Date(log.executed_at).toLocaleString()}</span>
-                              <span className="truncate flex-1">{log.success ? 'Success' : log.error_message ?? 'Failed'}</span>
-                              <span className="text-muted-foreground">Attempt {log.attempt}/{log.max_attempts}</span>
-                            </div>
-                          ))}
-                        </ScrollArea>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Live Activity Feed */}
-                  <Card className="border-border bg-card">
-                    <CardHeader className="p-3 pb-2">
-                      <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                        <BarChart3 className="w-3.5 h-3.5" />
-                        LIVE ACTIVITY FEED
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                      <ScrollArea className="h-64 terminal-scroll">
-                        {activityFeed.length === 0 && (
-                          <div className="text-xs text-muted-foreground text-center py-8">
-                            No activity yet. Send a command or enable Sample Data to see the feed.
-                          </div>
-                        )}
-                        {activityFeed.map((entry) => (
-                          <div key={entry.id} className="flex items-start gap-2 py-1.5 border-b border-border">
-                            <span className="text-xs text-muted-foreground w-14 flex-shrink-0">{entry.timestamp}</span>
-                            <StatusDot status={entry.status} />
-                            <AgentBadge agentId={entry.agentId} />
-                            <span className="text-xs flex-1">{entry.action}</span>
-                          </div>
-                        ))}
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-
-                  {/* Coordinator Summary */}
-                  {coordinatorData && (
-                    <Card className="border-border bg-card">
-                      <CardHeader className="p-3 pb-2">
-                        <CardTitle className="text-xs tracking-wider">COORDINATOR DAILY SUMMARY</CardTitle>
-                        {coordinatorData.cycle_date && (
-                          <CardDescription className="text-xs text-muted-foreground font-mono">{coordinatorData.cycle_date}</CardDescription>
-                        )}
-                      </CardHeader>
-                      <CardContent className="p-3 pt-0 space-y-2">
-                        {coordinatorData.daily_summary && (
-                          <div className="text-xs">{renderMarkdown(coordinatorData.daily_summary)}</div>
-                        )}
-                        {coordinatorData.outreach_summary && (
-                          <div className="text-xs text-muted-foreground">{coordinatorData.outreach_summary}</div>
-                        )}
-                        {Array.isArray(coordinatorData.next_actions) && coordinatorData.next_actions.length > 0 && (
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1 tracking-wider">NEXT ACTIONS:</div>
-                            <ul className="space-y-0.5">
-                              {coordinatorData.next_actions.map((action, i) => (
-                                <li key={i} className="text-xs flex items-center gap-1">
-                                  <ChevronRight className="w-3 h-3 text-primary" />
-                                  {action}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )}
+              <Bot className="w-4 h-4 text-primary" />
+              <span className="text-xs tracking-wider phosphor-glow font-semibold">AUTOHIRE TERMINAL</span>
+              <span className="flex-1" />
+              {isProcessing && (
+                <div className="flex items-center gap-1.5 text-xs text-primary">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span className="tracking-wider">{activeAgentId ? `${AGENT_INFO[activeAgentId]?.name ?? 'Agent'} processing...` : 'Processing...'}</span>
                 </div>
-
-                {/* Right: Kanban */}
-                <div className="lg:col-span-2">
-                  <Card className="border-border bg-card h-full">
-                    <CardHeader className="p-3 pb-2">
-                      <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                        <Briefcase className="w-3.5 h-3.5" />
-                        PIPELINE KANBAN
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                      <ScrollArea className="terminal-scroll">
-                        <div className="grid grid-cols-2 gap-3">
-                          {kanbanStatuses.map((status) => (
-                            <KanbanColumn
-                              key={status}
-                              title={status}
-                              jobs={getKanbanJobs(status)}
-                              count={getKanbanJobs(status).length}
-                            />
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              {/* Pending Actions */}
-              {metrics.pending > 0 && Array.isArray(coordinatorData?.high_priority_jobs) && (
-                <Card className="border-yellow-700 bg-card">
-                  <CardHeader className="p-3 pb-2">
-                    <CardTitle className="text-xs tracking-wider flex items-center gap-2 text-yellow-500">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      PENDING APPROVALS [{metrics.pending}]
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3 pt-0 space-y-2">
-                    {coordinatorData?.high_priority_jobs?.filter((j) => j.status?.toLowerCase().includes('pending') || j.action_taken?.toLowerCase().includes('pending')).map((job, i) => (
-                      <div key={i} className="flex items-center justify-between border border-yellow-800 p-2">
-                        <div className="text-xs">
-                          <span className="font-semibold">{job.company ?? 'Unknown'}</span>
-                          <span className="text-muted-foreground"> - {job.title ?? 'N/A'}</span>
-                          <span className="ml-2 text-yellow-500">{job.action_taken ?? ''}</span>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button size="sm" variant="default" className="h-6 text-xs font-mono tracking-wider" onClick={async () => {
-                            setActiveAgentId(AGENT_IDS.telegramNotifier)
-                            await callAIAgent(`Approve application for ${job.title} at ${job.company}. Send approval notification.`, AGENT_IDS.telegramNotifier)
-                            setActiveAgentId(null)
-                            addActivity(AGENT_IDS.telegramNotifier, `Approved: ${job.title} at ${job.company}`, 'success')
-                          }}>
-                            <Check className="w-3 h-3 mr-1" />APPROVE
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-6 text-xs font-mono tracking-wider" onClick={async () => {
-                            setActiveAgentId(AGENT_IDS.telegramNotifier)
-                            await callAIAgent(`Reject application for ${job.title} at ${job.company}. Send rejection notification.`, AGENT_IDS.telegramNotifier)
-                            setActiveAgentId(null)
-                            addActivity(AGENT_IDS.telegramNotifier, `Rejected: ${job.title} at ${job.company}`, 'success')
-                          }}>
-                            <X className="w-3 h-3 mr-1" />REJECT
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
               )}
+              <div className="text-xs text-muted-foreground tracking-wider">{currentTime}</div>
             </div>
-          )}
 
-          {/* ============================================================ */}
-          {/* TAB 2: CV STRATEGY PROFILE */}
-          {/* ============================================================ */}
-          {activeTab === 'cv' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Upload Zone */}
-                <div className="space-y-4">
-                  <Card className="border-border bg-card">
-                    <CardHeader className="p-3 pb-2">
-                      <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                        <Upload className="w-3.5 h-3.5" />
-                        CV UPLOAD
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 space-y-3">
-                      <div
-                        className="border-2 border-dashed border-border p-6 text-center cursor-pointer hover:border-primary transition-colors"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                        <div className="text-xs text-muted-foreground tracking-wider">DROP CV HERE OR CLICK</div>
-                        <div className="text-xs text-muted-foreground mt-1">PDF, DOCX, TXT</div>
-                      </div>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".pdf,.docx,.txt"
-                        className="hidden"
-                        onChange={handleCVUpload}
-                      />
-                      <Button
-                        onClick={handleAnalyzeCV}
-                        disabled={cvLoading}
-                        className="w-full font-mono text-xs tracking-wider"
-                      >
-                        {cvLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Sparkles className="w-3.5 h-3.5 mr-2" />}
-                        ANALYZE CV
-                      </Button>
-                      {cvStatus && (
-                        <div className="text-xs text-muted-foreground border border-border p-1.5 bg-secondary">{cvStatus}</div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Uploaded Documents */}
-                  <Card className="border-border bg-card">
-                    <CardHeader className="p-3 pb-2">
-                      <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                        <FileText className="w-3.5 h-3.5" />
-                        KB DOCUMENTS
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                      {ragHook.loading && <div className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Loading...</div>}
-                      {ragHook.error && <div className="text-xs text-red-500">{ragHook.error}</div>}
-                      {Array.isArray(ragHook.documents) && ragHook.documents.length === 0 && (
-                        <div className="text-xs text-muted-foreground text-center py-4">No documents uploaded</div>
-                      )}
-                      {Array.isArray(ragHook.documents) && ragHook.documents.map((doc, i) => (
-                        <div key={i} className="flex items-center justify-between py-1 border-b border-border text-xs">
-                          <div className="flex items-center gap-1 truncate flex-1">
-                            <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                            <span className="truncate">{doc.fileName}</span>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-5 w-5 p-0"
-                            onClick={() => handleDeleteDoc(doc.fileName)}
-                          >
-                            <Trash2 className="w-3 h-3 text-red-500" />
-                          </Button>
+            {/* Chat messages */}
+            <ScrollArea className="flex-1 p-0">
+              <div className="p-4 space-y-3">
+                {messages.map((msg) => (
+                  <div key={msg.id} className="group">
+                    {/* System message */}
+                    {msg.type === 'system' && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-primary font-bold flex-shrink-0 tracking-wider">[SYS]</span>
+                        <div className="flex-1 min-w-0">
+                          <pre className="text-xs whitespace-pre-wrap break-words">{msg.content}</pre>
                         </div>
-                      ))}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-2 w-full text-xs tracking-wider font-mono"
-                        onClick={() => ragHook.fetchDocuments(RAG_ID)}
-                      >
-                        <RefreshCw className="w-3 h-3 mr-1" />
-                        REFRESH
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
+                        <span className="text-xs text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">{msg.timestamp}</span>
+                      </div>
+                    )}
 
-                {/* Profile Display */}
-                <div className="lg:col-span-2 space-y-4">
-                  {!cvProfile && !cvLoading && (
-                    <Card className="border-border bg-card">
-                      <CardContent className="p-8 text-center">
-                        <Shield className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                        <div className="text-sm tracking-wider mb-2">NO STRATEGY PROFILE</div>
-                        <div className="text-xs text-muted-foreground">Upload a CV and click ANALYZE to generate your strategy profile.</div>
-                      </CardContent>
-                    </Card>
-                  )}
+                    {/* User message */}
+                    {msg.type === 'user' && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs font-bold flex-shrink-0 phosphor-glow-strong">&gt;</span>
+                        <div className="flex-1 min-w-0 phosphor-glow">
+                          <span className="text-xs font-semibold">{msg.content}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">{msg.timestamp}</span>
+                      </div>
+                    )}
 
-                  {cvLoading && (
-                    <Card className="border-border bg-card">
-                      <CardContent className="p-8 text-center">
-                        <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin" />
-                        <div className="text-xs tracking-wider">ANALYZING CV...</div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {cvProfile && !cvLoading && (
-                    <>
-                      {/* Target Roles */}
-                      <Card className="border-border bg-card">
-                        <CardHeader className="p-3 pb-2">
-                          <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                            <Target className="w-3.5 h-3.5" />
-                            TARGET ROLES
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-3 pt-0">
-                          <div className="flex flex-wrap gap-1.5">
-                            {Array.isArray(cvProfile.target_roles) && cvProfile.target_roles.map((role, i) => (
-                              <Badge key={i} variant="outline" className="font-mono text-xs">{role}</Badge>
-                            ))}
-                          </div>
-                          {cvProfile.experience_years && (
-                            <div className="text-xs text-muted-foreground mt-2">{cvProfile.experience_years} years experience</div>
+                    {/* Agent message */}
+                    {msg.type === 'agent' && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-primary font-bold flex-shrink-0 tracking-wider">[{msg.agentName ?? 'AGENT'}]</span>
+                        <div className="flex-1 min-w-0">
+                          {msg.content && <div className="text-xs">{msg.content}</div>}
+                          {msg.data && (
+                            <Card className="border-border bg-secondary mt-1">
+                              <CardContent className="p-3">
+                                {renderAgentData(msg.agentId, msg.data)}
+                              </CardContent>
+                            </Card>
                           )}
-                        </CardContent>
-                      </Card>
-
-                      {/* Skills + Strengths */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card className="border-border bg-card">
-                          <CardHeader className="p-3 pb-2">
-                            <CardTitle className="text-xs tracking-wider">SKILLS MATRIX</CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-3 pt-0 space-y-1.5">
-                            {Array.isArray(cvProfile.top_skills) && cvProfile.top_skills.map((skill, i) => (
-                              <SkillBar key={i} skill={skill} level={95 - i * 8} />
-                            ))}
-                          </CardContent>
-                        </Card>
-
-                        <Card className="border-border bg-card">
-                          <CardHeader className="p-3 pb-2">
-                            <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                              <Check className="w-3.5 h-3.5" />
-                              KEY STRENGTHS
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-3 pt-0">
-                            <ul className="space-y-1">
-                              {Array.isArray(cvProfile.key_strengths) && cvProfile.key_strengths.map((s, i) => (
-                                <li key={i} className="text-xs flex items-start gap-1.5">
-                                  <Check className="w-3 h-3 mt-0.5 text-primary flex-shrink-0" />
-                                  {s}
-                                </li>
-                              ))}
-                            </ul>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      {/* Differentiators */}
-                      <Card className="border-border bg-card">
-                        <CardHeader className="p-3 pb-2">
-                          <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                            <Star className="w-3.5 h-3.5" />
-                            DIFFERENTIATORS
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-3 pt-0">
-                          <ul className="space-y-1">
-                            {Array.isArray(cvProfile.differentiators) && cvProfile.differentiators.map((d, i) => (
-                              <li key={i} className="text-xs flex items-start gap-1.5">
-                                <Sparkles className="w-3 h-3 mt-0.5 text-primary flex-shrink-0" />
-                                {d}
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-
-                      {/* Strategy Summary */}
-                      {cvProfile.strategy_summary && (
-                        <Card className="border-border bg-card">
-                          <CardHeader className="p-3 pb-2">
-                            <CardTitle className="text-xs tracking-wider">STRATEGY SUMMARY</CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-3 pt-0">
-                            <div className="text-xs">{renderMarkdown(cvProfile.strategy_summary)}</div>
-                          </CardContent>
-                        </Card>
-                      )}
-
-                      {/* Channels + Salary */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card className="border-border bg-card">
-                          <CardHeader className="p-3 pb-2">
-                            <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                              <Globe className="w-3.5 h-3.5" />
-                              CHANNELS
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-3 pt-0">
-                            <ul className="space-y-1">
-                              {Array.isArray(cvProfile.recommended_channels) && cvProfile.recommended_channels.map((ch, i) => (
-                                <li key={i} className="text-xs flex items-center gap-1.5">
-                                  <ArrowRight className="w-3 h-3 text-primary" />
-                                  {ch}
-                                </li>
-                              ))}
-                            </ul>
-                          </CardContent>
-                        </Card>
-
-                        <Card className="border-border bg-card">
-                          <CardHeader className="p-3 pb-2">
-                            <CardTitle className="text-xs tracking-wider">SALARY POSITIONING</CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-3 pt-0">
-                            <div className="text-sm phosphor-glow font-semibold">{cvProfile.salary_positioning ?? '--'}</div>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      {/* Gaps + Fixes */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card className="border-border bg-card border-red-900">
-                          <CardHeader className="p-3 pb-2">
-                            <CardTitle className="text-xs tracking-wider text-red-500 flex items-center gap-2">
-                              <AlertTriangle className="w-3.5 h-3.5" />
-                              CV GAPS
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-3 pt-0">
-                            <ul className="space-y-1">
-                              {Array.isArray(cvProfile.cv_gaps) && cvProfile.cv_gaps.map((gap, i) => (
-                                <li key={i} className="text-xs flex items-start gap-1.5 text-red-400">
-                                  <X className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                  {gap}
-                                </li>
-                              ))}
-                            </ul>
-                          </CardContent>
-                        </Card>
-
-                        <Card className="border-border bg-card border-green-900">
-                          <CardHeader className="p-3 pb-2">
-                            <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                              <Check className="w-3.5 h-3.5" />
-                              QUICK FIXES
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-3 pt-0">
-                            <ul className="space-y-1">
-                              {Array.isArray(cvProfile.quick_fixes) && cvProfile.quick_fixes.map((fix, i) => (
-                                <li key={i} className="text-xs flex items-start gap-1.5">
-                                  <Check className="w-3 h-3 mt-0.5 text-primary flex-shrink-0" />
-                                  {fix}
-                                </li>
-                              ))}
-                            </ul>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ============================================================ */}
-          {/* TAB 3: APPLICATION ARCHIVE */}
-          {/* ============================================================ */}
-          {activeTab === 'archive' && (
-            <div className="space-y-4">
-              {/* Stats Bar */}
-              <div className="grid grid-cols-3 gap-2">
-                <MetricCard label="Total Applications" value={applications.length} icon={<FileText className="w-3.5 h-3.5" />} />
-                <MetricCard label="Outreach Sent" value={outreachTargets.length} icon={<Mail className="w-3.5 h-3.5" />} />
-                <MetricCard label="Interviews" value={interviews.length} icon={<Calendar className="w-3.5 h-3.5" />} />
-              </div>
-
-              {/* Filter */}
-              <div className="flex gap-2 items-center">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input
-                    value={archiveSearch}
-                    onChange={(e) => setArchiveSearch(e.target.value)}
-                    placeholder="Search by company or role..."
-                    className="pl-8 font-mono text-xs bg-input border-border"
-                  />
-                </div>
-              </div>
-
-              {/* Application Table */}
-              <Card className="border-border bg-card">
-                <CardHeader className="p-3 pb-2">
-                  <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" />
-                    APPLICATIONS
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 pt-0">
-                  {filteredApplications.length === 0 && (
-                    <div className="text-xs text-muted-foreground text-center py-6">
-                      No applications yet. Run the coordinator or enable Sample Data.
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    {filteredApplications.map((app, idx) => (
-                      <div key={idx} className="border border-border">
-                        <button
-                          className="w-full flex items-center gap-3 p-2 text-xs hover:bg-secondary transition-colors text-left"
-                          onClick={() => setExpandedApp(expandedApp === idx ? null : idx)}
-                        >
-                          {expandedApp === idx ? <ChevronDown className="w-3 h-3 flex-shrink-0" /> : <ChevronRight className="w-3 h-3 flex-shrink-0" />}
-                          <span className="font-semibold w-24 truncate">{app.company ?? '--'}</span>
-                          <span className="flex-1 truncate text-muted-foreground">{app.job_title ?? '--'}</span>
-                          <Badge variant="outline" className="text-xs font-mono">Applied</Badge>
-                        </button>
-                        {expandedApp === idx && (
-                          <div className="p-3 border-t border-border bg-secondary space-y-3">
-                            {app.cover_letter && (
-                              <div>
-                                <div className="text-xs text-muted-foreground tracking-wider mb-1">COVER LETTER:</div>
-                                <div className="text-xs">{renderMarkdown(app.cover_letter)}</div>
-                              </div>
-                            )}
-                            {app.application_message && (
-                              <div>
-                                <div className="text-xs text-muted-foreground tracking-wider mb-1">APPLICATION MESSAGE:</div>
-                                <div className="text-xs">{renderMarkdown(app.application_message)}</div>
-                              </div>
-                            )}
-                            {Array.isArray(app.highlighted_projects) && app.highlighted_projects.length > 0 && (
-                              <div>
-                                <div className="text-xs text-muted-foreground tracking-wider mb-1">HIGHLIGHTED PROJECTS:</div>
-                                <ul className="space-y-0.5">
-                                  {app.highlighted_projects.map((p, pi) => (
-                                    <li key={pi} className="text-xs flex items-center gap-1">
-                                      <ChevronRight className="w-3 h-3 text-primary" />{p}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {Array.isArray(app.key_alignment_points) && app.key_alignment_points.length > 0 && (
-                              <div>
-                                <div className="text-xs text-muted-foreground tracking-wider mb-1">KEY ALIGNMENT:</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {app.key_alignment_points.map((k, ki) => (
-                                    <Badge key={ki} variant="outline" className="text-xs font-mono">{k}</Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Interview Schedule */}
-              <Card className="border-border bg-card">
-                <CardHeader className="p-3 pb-2">
-                  <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                    <Calendar className="w-3.5 h-3.5" />
-                    INTERVIEW SCHEDULE
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 pt-0 space-y-3">
-                  {/* Existing Interviews */}
-                  {interviews.length > 0 && (
-                    <div className="space-y-1">
-                      {interviews.map((iv, i) => (
-                        <div key={i} className="border border-border p-2 text-xs flex flex-wrap items-center gap-2">
-                          <StatusDot status={iv.interview_scheduled ? 'success' : 'pending'} />
-                          <span className="font-semibold">{iv.company ?? '--'}</span>
-                          <span className="text-muted-foreground">{iv.role ?? ''}</span>
-                          <Separator orientation="vertical" className="h-3" />
-                          <span>{iv.interview_date ?? '--'} {iv.interview_time ?? ''}</span>
-                          <Badge variant="outline" className="text-xs font-mono">{iv.interview_format ?? 'TBD'}</Badge>
-                          {iv.interviewer && <span className="text-muted-foreground">w/ {iv.interviewer}</span>}
-                          {iv.calendar_event_created && <Badge variant="outline" className="text-xs font-mono">CAL</Badge>}
-                          {iv.notes && <div className="w-full text-muted-foreground mt-1">{iv.notes}</div>}
+                          {!msg.data && msg.content && msg.content.length > 50 && (
+                            <div className="text-xs mt-1">{renderMarkdown(msg.content)}</div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        <span className="text-xs text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">{msg.timestamp}</span>
+                      </div>
+                    )}
 
-                  {/* Schedule New Interview Form */}
-                  <div className="border border-border p-3 space-y-2">
-                    <div className="text-xs tracking-wider text-muted-foreground mb-2">SCHEDULE NEW INTERVIEW</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs font-mono">Recruiter Email *</Label>
-                        <Input
-                          type="email"
-                          placeholder="recruiter@company.com"
-                          value={interviewForm.recruiterEmail}
-                          onChange={(e) => setInterviewForm((prev) => ({ ...prev, recruiterEmail: e.target.value }))}
-                          className="font-mono text-xs bg-input border-border"
-                        />
+                    {/* Error message */}
+                    {msg.type === 'error' && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-red-500 font-bold flex-shrink-0 tracking-wider">[ERR]</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs text-red-400">{msg.content}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">{msg.timestamp}</span>
                       </div>
-                      <div>
-                        <Label className="text-xs font-mono">Availability</Label>
-                        <Input
-                          placeholder="Weekdays 9am-5pm PT"
-                          value={interviewForm.availability}
-                          onChange={(e) => setInterviewForm((prev) => ({ ...prev, availability: e.target.value }))}
-                          className="font-mono text-xs bg-input border-border"
-                        />
+                    )}
+
+                    {/* File message */}
+                    {msg.type === 'file' && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs text-primary font-bold flex-shrink-0 tracking-wider">[FILE]</span>
+                        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                          <FileText className="w-3 h-3 text-primary flex-shrink-0" />
+                          <span className="text-xs">{msg.content}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">{msg.timestamp}</span>
                       </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs font-mono">Thread Context *</Label>
-                      <Textarea
-                        placeholder="Describe the email thread context (e.g., 'Follow up on Senior Engineer role at Stripe, recruiter wants to schedule technical screen')"
-                        value={interviewForm.threadContext}
-                        onChange={(e) => setInterviewForm((prev) => ({ ...prev, threadContext: e.target.value }))}
-                        rows={3}
-                        className="font-mono text-xs bg-input border-border"
-                      />
-                    </div>
-                    <Button
-                      onClick={handleScheduleInterview}
-                      disabled={interviewLoading || !interviewForm.recruiterEmail || !interviewForm.threadContext}
-                      className="w-full font-mono text-xs tracking-wider"
-                    >
-                      {interviewLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Calendar className="w-3.5 h-3.5 mr-2" />}
-                      SCHEDULE INTERVIEW
-                    </Button>
-                    {interviewStatus && (
-                      <div className="text-xs text-muted-foreground border border-border p-1.5 bg-secondary">{interviewStatus}</div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                ))}
 
-              {/* Outreach Management */}
-              <Card className="border-border bg-card">
-                <CardHeader className="p-3 pb-2">
-                  <CardTitle className="text-xs tracking-wider flex items-center gap-2">
-                    <Mail className="w-3.5 h-3.5" />
-                    OUTREACH MANAGEMENT
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 pt-0 space-y-3">
-                  {/* Existing Outreach */}
-                  {outreachTargets.length > 0 && (
-                    <div className="space-y-1">
-                      {outreachTargets.map((t, i) => (
-                        <div key={i} className="border border-border p-2 text-xs flex items-center gap-2">
-                          <StatusDot status={t.email_status?.toLowerCase() === 'sent' ? 'success' : 'pending'} />
-                          <span className="font-semibold">{t.name ?? '--'}</span>
-                          <span className="text-muted-foreground">{t.company ?? ''}</span>
-                          <span className="text-muted-foreground">{t.role ?? ''}</span>
-                          <span className="flex-1" />
-                          <Badge variant="outline" className="text-xs font-mono">{t.sequence_stage ?? '--'}</Badge>
-                          <Badge variant="outline" className="text-xs font-mono">{t.email_status ?? '--'}</Badge>
-                        </div>
-                      ))}
+                {/* Typing indicator */}
+                {isProcessing && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs text-primary font-bold flex-shrink-0 tracking-wider">[{activeAgentId ? (AGENT_INFO[activeAgentId]?.name ?? 'AGENT') : 'SYS'}]</span>
+                    <div className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-primary animate-pulse" />
+                      <span className="w-1.5 h-1.5 bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
+                      <span className="w-1.5 h-1.5 bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
                     </div>
-                  )}
-
-                  {/* Send Outreach Form */}
-                  <div className="border border-border p-3 space-y-2">
-                    <div className="text-xs tracking-wider text-muted-foreground mb-2">SEND OUTREACH</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-xs font-mono">Recipient Name *</Label>
-                        <Input
-                          placeholder="Jane Smith"
-                          value={outreachForm.recipientName}
-                          onChange={(e) => setOutreachForm((prev) => ({ ...prev, recipientName: e.target.value }))}
-                          className="font-mono text-xs bg-input border-border"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-mono">Email *</Label>
-                        <Input
-                          type="email"
-                          placeholder="jane@company.com"
-                          value={outreachForm.email}
-                          onChange={(e) => setOutreachForm((prev) => ({ ...prev, email: e.target.value }))}
-                          className="font-mono text-xs bg-input border-border"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-mono">Company</Label>
-                        <Input
-                          placeholder="Stripe"
-                          value={outreachForm.company}
-                          onChange={(e) => setOutreachForm((prev) => ({ ...prev, company: e.target.value }))}
-                          className="font-mono text-xs bg-input border-border"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-mono">Role</Label>
-                        <Input
-                          placeholder="Engineering Recruiter"
-                          value={outreachForm.role}
-                          onChange={(e) => setOutreachForm((prev) => ({ ...prev, role: e.target.value }))}
-                          className="font-mono text-xs bg-input border-border"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-xs font-mono">Context</Label>
-                      <Textarea
-                        placeholder="Interested in Senior Engineer role, strong match with distributed systems background..."
-                        value={outreachForm.context}
-                        onChange={(e) => setOutreachForm((prev) => ({ ...prev, context: e.target.value }))}
-                        rows={3}
-                        className="font-mono text-xs bg-input border-border"
-                      />
-                    </div>
-                    <Button
-                      onClick={handleOutreach}
-                      disabled={outreachLoading || !outreachForm.email || !outreachForm.recipientName}
-                      className="w-full font-mono text-xs tracking-wider"
-                    >
-                      {outreachLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Send className="w-3.5 h-3.5 mr-2" />}
-                      SEND OUTREACH
-                    </Button>
-                    {outreachStatus && (
-                      <div className="text-xs text-muted-foreground border border-border p-1.5 bg-secondary">{outreachStatus}</div>
-                    )}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
+                )}
 
-        {/* AGENT STATUS FOOTER */}
-        <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-card px-4 py-2 z-50">
-          <div className="max-w-[1400px] mx-auto flex items-center gap-3 overflow-x-auto terminal-scroll">
-            <span className="text-xs text-muted-foreground tracking-wider flex-shrink-0">AGENTS:</span>
-            {Object.entries(AGENT_INFO).map(([id, info]) => (
-              <div key={id} className="flex items-center gap-1.5 flex-shrink-0">
-                <StatusDot status={activeAgentId === id ? 'active' : 'idle'} />
-                <span className={`text-xs tracking-wider ${activeAgentId === id ? 'text-foreground phosphor-glow' : 'text-muted-foreground'}`}>
-                  {info.name}
-                </span>
+                {/* Inline Forms */}
+                {showOutreachForm && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs text-primary font-bold flex-shrink-0 tracking-wider">[SYS]</span>
+                    <div className="flex-1 min-w-0">
+                      <InlineOutreachForm onSubmit={handleOutreachFormSubmit} loading={isProcessing} />
+                    </div>
+                  </div>
+                )}
+                {showScheduleForm && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs text-primary font-bold flex-shrink-0 tracking-wider">[SYS]</span>
+                    <div className="flex-1 min-w-0">
+                      <InlineScheduleForm onSubmit={handleScheduleFormSubmit} loading={isProcessing} />
+                    </div>
+                  </div>
+                )}
+                {showCraftForm && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs text-primary font-bold flex-shrink-0 tracking-wider">[SYS]</span>
+                    <div className="flex-1 min-w-0">
+                      <InlineCraftForm onSubmit={handleCraftFormSubmit} loading={isProcessing} />
+                    </div>
+                  </div>
+                )}
+
+                <div ref={chatEndRef} />
               </div>
-            ))}
+            </ScrollArea>
+
+            {/* Input bar */}
+            <div className="border-t border-border bg-card p-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-foreground text-sm phosphor-glow font-bold flex-shrink-0">&gt;</span>
+                <Input
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type a command (/help) or message..."
+                  className="flex-1 bg-transparent border-none text-foreground placeholder:text-muted-foreground focus-visible:ring-0 font-mono text-sm h-8"
+                  disabled={isProcessing}
+                  autoFocus
+                />
+                <Button onClick={handleSubmit} disabled={isProcessing || !inputValue.trim()} size="sm" className="font-mono text-xs tracking-wider h-8 px-3">
+                  {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                </Button>
+              </div>
+              <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><ArrowUp className="w-3 h-3" /><ArrowDown className="w-3 h-3" /> History</span>
+                <span className="flex items-center gap-1"><Hash className="w-3 h-3" /> /help for commands</span>
+                <span className="flex-1" />
+                <span>{messages.length} messages</span>
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Bottom spacer for fixed footer */}
-        <div className="h-10" />
       </div>
     </ErrorBoundary>
   )
